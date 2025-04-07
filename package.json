@@ -15,7 +15,7 @@
     "commands": [
       {
         "command": "vscode-taurify.init",
-        "title": "Init taurify"
+        "title": "Init Taurify"
       },
       {
         "command": "vscode-taurify.dev",
@@ -39,7 +39,7 @@
       }
     ],
     "configuration": {
-      "title": "Taurify settings",
+      "title": "Taurify",
       "type": "object",
       "properties": {
         "taurify.orgsKeys": {

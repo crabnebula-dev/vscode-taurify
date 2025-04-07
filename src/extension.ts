@@ -1,5 +1,8 @@
 import * as vscode from 'vscode';
 
+// debugging; TODO: remove
+(globalThis as any).vscode = vscode;
+
 const blocks = " ▏▎▍▌▋▊▉▉▉";
 
 let statusBarItem: vscode.StatusBarItem;
@@ -43,12 +46,10 @@ export function activate(context: vscode.ExtensionContext) {
 	statusBarItem.text = 'Taurify';
 	statusBarItem.command = 'vscode-taurify.menu';
 	
-	console.log('taurify', 'check for taurify.json');
-
 	// check for taurify.json in project root
 	vscode.workspace.findFiles('taurify.json').then((found) => {
 		if (found.length) {
-			statusBarItem!.text = 'found taurify.json';			
+			statusBarItem!.text = 'found taurify.json';
 		} else {
 			noConfigFound();
 		}
@@ -57,10 +58,54 @@ export function activate(context: vscode.ExtensionContext) {
 		noConfigFound();
 	});	
 
-	const initCommand = vscode.commands.registerCommand('vscode-taurify.init', () => {
-		
+	const initCommand = vscode.commands.registerCommand('vscode-taurify.init', async () => {
+		const settings = vscode.workspace.getConfiguration('taurify');
+		const orgSlugs = Object.keys(settings.orgsKeys).filter(key => key !== 'myOrgSlug');
+		let orgSlug: string | undefined = orgSlugs[0];
+		if (orgSlugs.length === 0) {			
+			vscode.commands.executeCommand('workbench.action.openSettingsJson');
+			return;
+		} else if (orgSlugs.length > 1) {
+			orgSlug = (await vscode.window.showQuickPick(orgSlugs, { title: "Select your organization" }))?.[0];
+		}
+		console.log(orgSlugs, orgSlug);
+		// TODO: init with orgslug
+		/*
+		const initTask = new vscode.Task({
+			definition: `taurify init --orgslug `
+			execution: vscode.ShellExecution,
+			isBackground: false,
+			name: "taurify-init"
+		});
+		*/
 	});
 	context.subscriptions.push(initCommand);
+
+	const devCommand = vscode.commands.registerCommand('vscode-taurify.dev', () => {
+		// TODO: finalize
+		const devTask = new vscode.Task({
+			label: "Run in development mode",
+			type: "shell",
+			command: `taurify dev`
+		}, "workspace", "taurify-dev");
+	});
+	context.subscriptions.push(devCommand);
+
+	const runCommand = vscode.commands.registerCommand('vscode-taurify.run', () => {
+
+	});
+	context.subscriptions.push(runCommand);
+
+	const buildCommand = vscode.commands.registerCommand('vscode-taurify.build', () => {
+
+	});
+	context.subscriptions.push(buildCommand);
+
+	const updateCommand = vscode.commands.registerCommand('vscode-taurify.update', () => {
+
+	});
+	context.subscriptions.push(updateCommand);
+
 	/*
 
 	const disposable = vscode.commands.registerCommand('vscode-taurify.taurify', () => {
