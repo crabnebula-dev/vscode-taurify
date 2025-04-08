@@ -10,6 +10,14 @@ let statusBarItem: vscode.StatusBarItem;
 
 const outputChannel = vscode.window.createOutputChannel('taurify');
 
+const runAbortable = async (command: string) => {
+	const abort = new AbortController();
+	const { stdout, stderr } = await exec(command, { signal: abort.signal});
+	stdout?.on('data', (chunk) => outputChannel.append(chunk.toString()));
+	stderr?.on('data', (chunk) => outputChannel.append(chunk.toString()));
+	return new vscode.Disposable(() => abort.abort());
+}
+
 function getBar(progress: number) {	
 	const lastDigit = progress % 10;
 	const firstDigit = (progress - lastDigit) / 10;
@@ -76,48 +84,34 @@ export function activate(context: vscode.ExtensionContext) {
 			vscode.window.showErrorMessage('Org slug missing. Please select an org slug to initialize your taurify project.');
 			return;
 		}
-		const abort = new AbortController();
-		// TODO: finalize command
-		const { stdout, stderr } = await exec(`npx taurify init --orgslug ${orgSlug} --orgKey ${settings.orgsKeys[orgSlug]}`, { signal: abort.signal});
-		stdout?.on('data', (chunk) => outputChannel.append(chunk.toString()));
-		stderr?.on('data', (chunk) => outputChannel.append(chunk.toString()));
-		context.subscriptions.push(new vscode.Disposable(() => abort.abort()));
+		const initCall = await runAbortable(
+			`npx taurify init --orgslug ${orgSlug} --orgKey ${settings.orgsKeys[orgSlug]}`
+		);
+		context.subscriptions.push(initCall);		
 	});
 	context.subscriptions.push(initCommand);
 
 	const devCommand = vscode.commands.registerCommand('vscode-taurify.dev', async () => {
-		const abort = new AbortController();
-		const { stdout, stderr } = await exec('npx taurify dev', { signal: abort.signal});
-		stdout?.on('data', (chunk) => outputChannel.append(chunk.toString()));
-		stderr?.on('data', (chunk) => outputChannel.append(chunk.toString()));
-		context.subscriptions.push(new vscode.Disposable(() => abort.abort()));
+		const devCall = await runAbortable('npx taurify dev');
+		context.subscriptions.push(devCall);
 	});
 	context.subscriptions.push(devCommand);
 
 	const runCommand = vscode.commands.registerCommand('vscode-taurify.run', async () => {
-		const abort = new AbortController();
-		const { stdout, stderr } = await exec('npx taurify run', { signal: abort.signal});
-		stdout?.on('data', (chunk) => outputChannel.append(chunk.toString()));
-		stderr?.on('data', (chunk) => outputChannel.append(chunk.toString()));
-		context.subscriptions.push(new vscode.Disposable(() => abort.abort()));
+		const runCall = await runAbortable('npx taurify run');
+		context.subscriptions.push(runCall);
 	});
 	context.subscriptions.push(runCommand);
 
 	const buildCommand = vscode.commands.registerCommand('vscode-taurify.build', async () => {
-		const abort = new AbortController();
-		const { stdout, stderr } = await exec('npx taurify build', { signal: abort.signal});
-		stdout?.on('data', (chunk) => outputChannel.append(chunk.toString()));
-		stderr?.on('data', (chunk) => outputChannel.append(chunk.toString()));
-		context.subscriptions.push(new vscode.Disposable(() => abort.abort()));
+		const buildCall = await runAbortable('npx taurify build');
+		context.subscriptions.push(buildCall);
 	});
 	context.subscriptions.push(buildCommand);
 
 	const updateCommand = vscode.commands.registerCommand('vscode-taurify.update', async () => {
-		const abort = new AbortController();
-		const { stdout, stderr } = await exec('npx taurify update', { signal: abort.signal});
-		stdout?.on('data', (chunk) => outputChannel.append(chunk.toString()));
-		stderr?.on('data', (chunk) => outputChannel.append(chunk.toString()));
-		context.subscriptions.push(new vscode.Disposable(() => abort.abort()));
+		const updateCall = await runAbortable('npx taurify update');
+		context.subscriptions.push(updateCall);
 	});
 	context.subscriptions.push(updateCommand);
 
