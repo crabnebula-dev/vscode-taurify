@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { exec } from 'node:child_process';
 
 // debugging; TODO: remove
 (globalThis as any).vscode = vscode;
@@ -6,6 +7,8 @@ import * as vscode from 'vscode';
 const blocks = " ▏▎▍▌▋▊▉▉▉";
 
 let statusBarItem: vscode.StatusBarItem;
+
+const outputChannel = vscode.window.createOutputChannel('taurify');
 
 function getBar(progress: number) {	
 	const lastDigit = progress % 10;
@@ -35,7 +38,7 @@ path to cn / cn.exe
 function noConfigFound() {
 	statusBarItem!.text = 'Taurify';
 	statusBarItem!.command = "vscode-taurify.init";
-	statusBarItem!.tooltip = "## Initialize this project with Taurify\n\nIf you click this status applet, your web app will be automatically converted to a tauri app."
+	statusBarItem!.tooltip = "## Initialize this project with Taurify\n\nIf you click this status applet, your web app will be automatically converted to a tauri app.";
 }
 
 export function activate(context: vscode.ExtensionContext) {
@@ -69,40 +72,52 @@ export function activate(context: vscode.ExtensionContext) {
 			orgSlug = (await vscode.window.showQuickPick(orgSlugs, { title: "Select your organization" }))?.[0];
 		}
 		console.log(orgSlugs, orgSlug);
-		// TODO: init with orgslug
-		/*
-		const initTask = new vscode.Task({
-			definition: `taurify init --orgslug `
-			execution: vscode.ShellExecution,
-			isBackground: false,
-			name: "taurify-init"
-		});
-		*/
+		if (!orgSlug) {
+			vscode.window.showErrorMessage('Org slug missing. Please select an org slug to initialize your taurify project.');
+			return;
+		}
+		const abort = new AbortController();
+		// TODO: finalize command
+		const { stdout, stderr } = await exec(`npx taurify init --orgslug ${orgSlug} --orgKey ${settings.orgsKeys[orgSlug]}`, { signal: abort.signal});
+		stdout?.on('data', (chunk) => outputChannel.append(chunk.toString()));
+		stderr?.on('data', (chunk) => outputChannel.append(chunk.toString()));
+		context.subscriptions.push(new vscode.Disposable(() => abort.abort()));
 	});
 	context.subscriptions.push(initCommand);
 
-	const devCommand = vscode.commands.registerCommand('vscode-taurify.dev', () => {
-		// TODO: finalize
-		const devTask = new vscode.Task({
-			label: "Run in development mode",
-			type: "shell",
-			command: `taurify dev`
-		}, "workspace", "taurify-dev");
+	const devCommand = vscode.commands.registerCommand('vscode-taurify.dev', async () => {
+		const abort = new AbortController();
+		const { stdout, stderr } = await exec('npx taurify dev', { signal: abort.signal});
+		stdout?.on('data', (chunk) => outputChannel.append(chunk.toString()));
+		stderr?.on('data', (chunk) => outputChannel.append(chunk.toString()));
+		context.subscriptions.push(new vscode.Disposable(() => abort.abort()));
 	});
 	context.subscriptions.push(devCommand);
 
-	const runCommand = vscode.commands.registerCommand('vscode-taurify.run', () => {
-
+	const runCommand = vscode.commands.registerCommand('vscode-taurify.run', async () => {
+		const abort = new AbortController();
+		const { stdout, stderr } = await exec('npx taurify run', { signal: abort.signal});
+		stdout?.on('data', (chunk) => outputChannel.append(chunk.toString()));
+		stderr?.on('data', (chunk) => outputChannel.append(chunk.toString()));
+		context.subscriptions.push(new vscode.Disposable(() => abort.abort()));
 	});
 	context.subscriptions.push(runCommand);
 
-	const buildCommand = vscode.commands.registerCommand('vscode-taurify.build', () => {
-
+	const buildCommand = vscode.commands.registerCommand('vscode-taurify.build', async () => {
+		const abort = new AbortController();
+		const { stdout, stderr } = await exec('npx taurify build', { signal: abort.signal});
+		stdout?.on('data', (chunk) => outputChannel.append(chunk.toString()));
+		stderr?.on('data', (chunk) => outputChannel.append(chunk.toString()));
+		context.subscriptions.push(new vscode.Disposable(() => abort.abort()));
 	});
 	context.subscriptions.push(buildCommand);
 
-	const updateCommand = vscode.commands.registerCommand('vscode-taurify.update', () => {
-
+	const updateCommand = vscode.commands.registerCommand('vscode-taurify.update', async () => {
+		const abort = new AbortController();
+		const { stdout, stderr } = await exec('npx taurify update', { signal: abort.signal});
+		stdout?.on('data', (chunk) => outputChannel.append(chunk.toString()));
+		stderr?.on('data', (chunk) => outputChannel.append(chunk.toString()));
+		context.subscriptions.push(new vscode.Disposable(() => abort.abort()));
 	});
 	context.subscriptions.push(updateCommand);
 
