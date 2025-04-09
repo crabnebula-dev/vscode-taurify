@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import { exec } from 'node:child_process';
+import { exec, ExecOptions } from 'node:child_process';
+import { ObjectEncodingOptions } from 'node:fs';
 
 // debugging; TODO: remove
 (globalThis as any).vscode = vscode;
@@ -10,15 +11,16 @@ let statusBarItem: vscode.StatusBarItem;
 
 const outputChannel = vscode.window.createOutputChannel('taurify');
 
-const runAbortable = async (command: string) => {
+const runAbortable = async (command: string, options: (ObjectEncodingOptions & ExecOptions) = {}) => {
 	const abort = new AbortController();
-	const { stdout, stderr } = await exec(command, { signal: abort.signal});
+	const process = await exec(command, { ...options, signal: abort.signal });
+	const { stdout, stderr } = process;
 	stdout?.on('data', (chunk) => outputChannel.append(chunk.toString()));
 	stderr?.on('data', (chunk) => outputChannel.append(chunk.toString()));
-	return new vscode.Disposable(() => abort.abort());
-}
+	return Object.assign(new vscode.Disposable(() => abort.abort()), { process });
+};
 
-function getBar(progress: number) {	
+function getBar(progress: number) {
 	const lastDigit = progress % 10;
 	const firstDigit = (progress - lastDigit) / 10;
 	return `${blocks[9].repeat(firstDigit)}${blocks[lastDigit]}`.trim();
@@ -55,7 +57,7 @@ export function activate(context: vscode.ExtensionContext) {
 	statusBarItem.accessibilityInformation = { role: "button", label: "Taurify" };	
 	statusBarItem.show();
 	statusBarItem.text = 'Taurify';
-	statusBarItem.command = 'vscode-taurify.menu';
+	statusBarItem.command = { title: "Taurify commands", command: "workbench.action.quickOpen", arguments: [">Taurify"] };
 	
 	// check for taurify.json in project root
 	vscode.workspace.findFiles('taurify.json').then((found) => {
@@ -85,7 +87,8 @@ export function activate(context: vscode.ExtensionContext) {
 			return;
 		}
 		const initCall = await runAbortable(
-			`npx taurify init --orgslug ${orgSlug} --orgKey ${settings.orgsKeys[orgSlug]}`
+			`npx taurify init --orgslug ${orgSlug} --appslug`,
+			{ env: { CN_API_KEY: settings.orgsKeys[orgSlug] } }
 		);
 		context.subscriptions.push(initCall);		
 	});

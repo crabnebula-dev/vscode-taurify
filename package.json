@@ -15,27 +15,23 @@
     "commands": [
       {
         "command": "vscode-taurify.init",
-        "title": "Init Taurify"
+        "title": "Taurify: Init"
       },
       {
         "command": "vscode-taurify.dev",
-        "title": "Run in development mode"
+        "title": "Taurify: Run in development mode"
       },
       {
         "command": "vscode-taurify.run",
-        "title": "Run in production mode"
+        "title": "Taurify: Run in production mode"
       },
       {
         "command": "vscode-taurify.build",
-        "title": "Build and upload to Cloud"
+        "title": "Taurify: Build with and upload to Cloud"
       },
       {
         "command": "vscode-taurify.update",
-        "title": "Distribute front-end update"
-      },
-      {
-        "command": "vscode-taurify.taurify",
-        "title": "Taurify"
+        "title": "Taurify: Distribute front-end update"
       }
     ],
     "configuration": {
