@@ -9,7 +9,7 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": ["*"],
+  "activationEvents": ["onStartupFinished"],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
@@ -27,21 +27,31 @@
       },
       {
         "command": "vscode-taurify.build",
-        "title": "Taurify: Build with and upload to Cloud"
+        "title": "Taurify: Start build and upload to Cloud"
       },
       {
         "command": "vscode-taurify.update",
-        "title": "Taurify: Distribute front-end update"
+        "title": "Taurify: Update front-end"
       }
     ],
     "configuration": {
       "title": "Taurify",
       "type": "object",
       "properties": {
-        "taurify.orgsKeys": {
-          "type": "object",
-          "default": { "myOrgSlug": "myAPIKey - check https://web.crabnebula.cloud - Organization / API keys" },
-          "description": "An object with org slugs and api keys for the CrabNebula Cloud"
+        "taurify.showStatusBarApplet": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show/Hide status bar applet"
+        },
+        "taurify.enableLogs": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable writing logs"
+        },
+        "taurify.logFile": {
+          "type": "string",
+          "default": ".taurify/taurify.log",
+          "description": "file to write log data to"
         }
       }
     }
