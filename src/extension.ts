@@ -89,27 +89,27 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
       <li>
         <label for="product-name">Product name</label>
         <p>The name of the product (used as application title).</p>
-        <input type="text" id="product-name" name="productName" />
+        <input type="text" id="product-name" name="productName" required />
       </li>
       <li>
         <label for="identifier">Canonical identifier</label>
         <p>A canonical identifier for the product, e.g. com.mycompany.myapp.</p>
-        <input type="text" id="identifier" name="identifier" />
+        <input type="text" id="identifier" name="identifier" pattern="(\\w+\\.){2,}\\w+" required />
       </li>
       <li>
         <label for="app-slug">Application slug</label>
         <p>The identifier for the application in your Cloud account.</p>
-        <input type="text" id="app-slug" name="appSlug" />
+        <input type="text" id="app-slug" name="appSlug" required />
       </li>
       <li>
         <label for="org-slug">Organization slug</label>
         <p>The identifier for the organization in your Cloud account. You can <a href="#new-org-slug">add organizations</a> below.</p>
-        <select id="org-slug" name="orgSlug">
+        <select id="org-slug" name="orgSlug" placeholder="No orgs configured" required>
           ${((orgSlugs) => orgSlugs.length
             ? orgSlugs.map(slug => `<option value="${escapeAttr(slug)}">
                 ${escapeHtml(slug)}
               </option>`).join('\n')
-            : '<option>No orgs configured</option>'
+            : '<option id="no-orgs" value="">Please add your organization below</option>'
           )(Object.keys(orgs))}
         </select>
       </li>
@@ -146,7 +146,7 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
       <li>
         <label for="password">Password</label>
         <p>A hidden passphrase to create a key pair for your application to sign updates.</p>
-        <input type="password" id="password" name="password" />
+        <input type="password" id="password" name="password" required />
       </li>
       <li>
         <label for="run-before-dev">Run before dev</label>
@@ -173,8 +173,8 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
   <h2>Taurify: Organizations</h2>
   <ul id="orgs">    
     <li id="add-org">
-      <input type="text" id="new-org-slug" placeholder="Org slug" />
-      <input type="password" id="new-org-key" placeholder="Org API key" />
+      <input type="text" id="new-org-slug" placeholder="Org slug" required />
+      <input type="password" id="new-org-key" placeholder="Org API key" required />
       <button id="add-org-button">Add org</button>
     </li>
   </ul>
@@ -208,7 +208,8 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
         document.getElementById('orgs').insertBefore(
           item,
           document.getElementById('add-org')
-        );        
+        );
+        document.getElementById('no-orgs')?.remove();
       }
       (${JSON.stringify(Object.keys(orgs) || [])}).forEach(addOrg);
       document.getElementById('add-org-button').addEventListener('click', (ev) => {
@@ -225,6 +226,9 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
           // TODO: error handling
           console.error('slug or key missing');
         }
+      });
+      document.querySelector('a[href="#new-org-slug"]').addEventListener('click', () => {
+        document.getElementById('new-org-slug').focus();
       });
     })(acquireVsCodeApi());
   </script>
