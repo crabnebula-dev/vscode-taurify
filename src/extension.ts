@@ -26,7 +26,7 @@ const runAbortable = async (
 };
 
 function escapeAttr(text: string) {
-  return text.replace(/(?:^|[^\\])(?:\\\\)*\\"/g, '\\"')
+  return text.replace(/(?:^|[^\\])(?:\\\\)*\\"/g, '\\"');
 }
 
 function escapeHtml(text: string) {
@@ -40,16 +40,18 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
   <title>Taurify: Initialization</title>
   <style>
     ul { list-style: none; padding: 0; }
-    h2 { padding: 10px 0px 0px; }
+    h2 { padding: 10px 0px 0px 10px; }
     li { padding: 10px; }
-    label { display: block; margin-bottom: 5px; }
-    label + p { margin-bottom: 5px; }
+    label { display: block; font-weight: 600; }
+    label + p { margin-bottom: 15px; }
     fieldset { border: 0; padding: 0; }
     fieldset label { display: inline-block; }
     fieldset label + label { margin-left: 10px; }
-    input, select { background: var(--vscode-settings-textInputBackground, inherit); color: inherit; border: none; padding: 4px 6px; }
-    input:focus, select:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+    input[type="text"], input[type="password"], textarea { min-width: 16rem; }
+    input, select, textarea { background: var(--vscode-settings-textInputBackground, inherit); color: inherit; border: none; padding: 4px 6px; }
+    input:focus, select:focus, textarea:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
     button { background: var(--vscode-button-background, inherit); color: inherit; border: none; padding: 4px; font: inherit; }
+    #orgs span { margin-right: 10px; }
   </style>
 </head>
 <body>
@@ -83,7 +85,7 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
       </li>
       <li>
         <label for="org-slug">Organization slug</label>
-        <p>The identifier for the organization in your Cloud account.</p>
+        <p>The identifier for the organization in your Cloud account. You can <a href="#new-org-slug">add organizations</a> below.</p>
         <select id="org-slug" name="orgSlug">
           ${((orgSlugs) => orgSlugs.length
             ? orgSlugs.map(slug => `<option value="${escapeAttr(slug)}">
@@ -145,8 +147,10 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
         </label>
         <p>Is the application already present in the Cloud or does it need to be bootstrapped?</p>
       </li>
+      <li>
+        <button id="run-taurify-init">Initialize project</button>
+      </li>
     </ul>
-    <button id="run-taurify-init">Initialize project</button>
   </form>
   <h2>Taurify: Organizations</h2>
   <ul id="orgs">    
@@ -156,36 +160,45 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
       <button id="add-org-button">Add org</button>
     </li>
   </ul>
-  <script>
+  <script type="text/javascript" nonce="${getNonce()}">
     ((vscode) => {
       document.getElementById('init-form').addEventListener('submit', (ev) => {
         ev.preventDefault();
         console.log(new FormData(ev.target));
       });
       function addOrg(slug) {
+        const option = document.createElement('option');
+        option.value = slug;
+        option.appendChild(new Text(slug));
+        document.getElementById('org-slug').appendChild(option);
         const item = document.createElement('li');
         const name = document.createElement('span');
         name.appendChild(new Text(slug));
         item.appendChild(name);
-        const delete = document.createElement('button');
-        delete.appendChild(new Text('delete'));
-        delete.addEventListener('click', () => {
+        const remove = document.createElement('button');
+        remove.appendChild(new Text('delete'));
+        remove.addEventListener('click', () => {
           vscode.postMessage({ deleteOrg: slug });
+          item.remove();
+          option.remove();
         });
-        item.appendChild(delete);
+        item.appendChild(remove);
         document.getElementById('orgs').insertBefore(
           item,
           document.getElementById('add-org')
-        );
+        );        
       }
-      ${JSON.stringify(Object.keys(orgs) || [])}.forEach(addOrg);
-      document.getElementById('add-org-button').addEventListener('click', () => {
-      ev.preventDefault();  
-      const slug = document.getElementById('new-org-slug').value;
-        const key = document.getElementById('new-org-key').value;
+      (${JSON.stringify(Object.keys(orgs) || [])}).forEach(addOrg);
+      document.getElementById('add-org-button').addEventListener('click', (ev) => {
+        ev.preventDefault();
+        const slugField = document.getElementById('new-org-slug');
+        const keyField = document.getElementById('new-org-key');
+        const slug = slugField.value;
+        const key = keyField.value;
         if (slug && key) {
-          vscode.postMessage{{ addOrg: { slug, key } });
+          vscode.postMessage({ addOrg: { slug, key } });
           addOrg(slug);
+          slugField.value = keyField.value = '';
         } else {
           // TODO: error handling
           console.error('slug or key missing');
@@ -196,43 +209,6 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
 </body>
 </html>`;
 }
-
-/*class InitViewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = 'taurify.initView';
-  private view?: vscode.WebviewView;
-  private orgs?: Record<string, string>;
-  constructor(
-    private readonly extensionUri: vscode.Uri,
-    private readonly secrets: vscode.SecretStorage,
-  ) {}
-  public resolveWebviewView(
-    webviewView: vscode.WebviewView,
-    context: vscode.WebviewViewResolveContext,
-    token?: vscode.CancellationToken
-  ): Thenable<void> | void {
-    this.view = webviewView;
-    webviewView.webview.options = { enableScripts: true };
-    webviewView.webview.html = ;
-    webviewView.webview.onDidReceiveMessage(data => {
-      if (!data.updateOrgs) { 
-        return;
-      }
-      this.secrets.store(ORGS_SECRET_STORAGE_KEY, JSON.stringify(data.updateOrgs ?? {}));
-    });
-    this.secrets.get(ORGS_SECRET_STORAGE_KEY).then((orgs) => {      
-      try {
-        orgs = JSON.parse(orgs ?? "{}");
-      } catch(e) {}
-      webviewView.webview.postMessage({ initOrgs: orgs });
-    });
-  }
-  setOrgs(orgs: Record<string, string>) {
-    this.orgs = orgs;
-  }
-  // TODO: store org (both new and overwrite old)
-  // TODO: delete org
-}*/
-
 
 function getBar(progress: number) {
   const lastDigit = progress % 10;
@@ -316,13 +292,26 @@ export function activate(context: vscode.ExtensionContext) {
         "taurify.initview",
         "Taurify",
         vscode.ViewColumn.One,
-        { enableForms: true, enableScripts: true }
+        { enableScripts: true }
       );
       initView.webview.html = createInitViewHTML(
         orgsKeys,
         vscode.workspace.workspaceFolders?.map(({name}) => name) ?? ['no folders found']
       );
       context.subscriptions.push(initView);
+
+      initView.webview.onDidReceiveMessage(({ addOrg, deleteOrg }) => {
+        let change = false;
+        if (addOrg) {
+          const { slug, key } = addOrg;
+          orgsKeys[slug] = key;
+          context.secrets.store(ORGS_SECRET_STORAGE_KEY, JSON.stringify(orgsKeys));
+        }
+        if (deleteOrg) {
+          delete orgsKeys[deleteOrg];
+          context.secrets.store(ORGS_SECRET_STORAGE_KEY, JSON.stringify(orgsKeys));
+        }
+      });
 
       const orgSlugs = Object.keys(orgsKeys).filter(
         (key) => key !== "myOrgSlug"
@@ -418,4 +407,13 @@ export function activate(context: vscode.ExtensionContext) {
 
 export function deactivate() {
   // TOOO: stop taurification process if possible
+}
+
+function getNonce() {
+	let text = '';
+	const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+	for (let i = 0; i < 32; i++) {
+		text += possible.charAt(Math.floor(Math.random() * possible.length));
+	}
+	return text;
 }
