@@ -131,12 +131,12 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
       <li>
         <label for="run-before-dev">Run before dev</label>
         <p>The script to run (e.g. <code>npm run dev</code>) before dev is started.</p>
-        <textare id="run-before-dev" name="runBeforeDev"></textarea>
+        <textarea id="run-before-dev" name="runBeforeDev"></textarea>
       </li>
       <li>
         <label for="run-before-build">Run before build</label>
         <p>The script to run (e.g. <code>npm run build</code>) before dev is started.</p>
-        <textare id="run-before-build" name="runBeforeBuild"></textarea>
+        <textarea id="run-before-build" name="runBeforeBuild"></textarea>
       </li>
       <li>
         <label for="bootstrap">
