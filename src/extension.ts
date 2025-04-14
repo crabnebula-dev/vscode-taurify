@@ -39,10 +39,11 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
 <head>
   <title>Taurify: Initialization</title>
   <style>
-    ul { list-style: none; padding: 0 0 20px 0; }
-    h2 { padding-left: 10px; }
+    ul { list-style: none; padding: 0; }
+    h2 { padding: 10px 0px 0px; }
     li { padding: 10px; }
-    label { display: block; }
+    label { display: block; margin-bottom: 5px; }
+    label + p { margin-bottom: 5px; }
     fieldset { border: 0; padding: 0; }
     fieldset label { display: inline-block; }
     fieldset label + label { margin-left: 10px; }
@@ -57,6 +58,7 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
     <ul id="init">
       <li>
         <label for="project-path">Project path</label>
+        <p>The path of the project that should be taurified.</p>
         <select id="project-path" name="projectPath">
           ${paths.map((path) => 
             `<option value="${escapeAttr(path)}">
@@ -66,18 +68,22 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
       </li>
       <li>
         <label for="product-name">Product name</label>
+        <p>The name of the product (used as application title).</p>
         <input type="text" id="product-name" name="productName" />
       </li>
       <li>
         <label for="identifier">Canonical identifier</label>
+        <p>A canonical identifier for the product, e.g. com.mycompany.myapp.</p>
         <input type="text" id="identifier" name="identifier" />
       </li>
       <li>
         <label for="app-slug">Application slug</label>
+        <p>The identifier for the application in your Cloud account.</p>
         <input type="text" id="app-slug" name="appSlug" />
       </li>
       <li>
         <label for="org-slug">Organization slug</label>
+        <p>The identifier for the organization in your Cloud account.</p>
         <select id="org-slug" name="orgSlug">
           ${((orgSlugs) => orgSlugs.length
             ? orgSlugs.map(slug => `<option value="${escapeAttr(slug)}">
@@ -89,6 +95,7 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
       </li>
       <li>
         <label for="platforms">Platforms</label>
+        <p>The platform(s) for which binaries should be created.</p>
         <fieldset id="platforms">
           <label for="platform-mac">Mac OS
             <input type="checkbox" id="platform-mac" name="platforms" value="mac" />
@@ -107,12 +114,42 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
           </label>
         </fieldset>
       </li>
+      <li>
+        <label for="package-manager">Package manager</label>
+        <p>The package manager your front-end uses.</p>
+        <select id="package-manager" name="packageManger">
+          <option value="npm">npm</option>
+          <option value="pnpm">pnpm</option>
+          <option value="yarn">yarn</option>
+        </select>
+      </li>
+      <li>
+        <label for="password">Password</label>
+        <p>A hidden passphrase to create a key pair for your application to sign updates.</p>
+        <input type="password" id="password" name="password" />
+      </li>
+      <li>
+        <label for="run-before-dev">Run before dev</label>
+        <p>The script to run (e.g. <code>npm run dev</code>) before dev is started.</p>
+        <textare id="run-before-dev" name="runBeforeDev"></textarea>
+      </li>
+      <li>
+        <label for="run-before-build">Run before build</label>
+        <p>The script to run (e.g. <code>npm run build</code>) before dev is started.</p>
+        <textare id="run-before-build" name="runBeforeBuild"></textarea>
+      </li>
+      <li>
+        <label for="bootstrap">
+          <input type="checkbox" id="bootstrap" name="bootstrap" value="true" />
+          Bootstrap
+        </label>
+        <p>Is the application already present in the Cloud or does it need to be bootstrapped?</p>
+      </li>
     </ul>
     <button id="run-taurify-init">Initialize project</button>
   </form>
   <h2>Taurify: Organizations</h2>
-  <ul id="orgs">
-    <li id="loading">Loading...</li>
+  <ul id="orgs">    
     <li id="add-org">
       <input type="text" id="new-org-slug" placeholder="Org slug" />
       <input type="password" id="new-org-key" placeholder="Org API key" />
@@ -121,7 +158,10 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
   </ul>
   <script>
     ((vscode) => {
-      let orgs;
+      document.getElementById('init-form').addEventListener('submit', (ev) => {
+        ev.preventDefault();
+        console.log(new FormData(ev.target));
+      });
       function addOrg(slug) {
         const item = document.createElement('li');
         const name = document.createElement('span');
@@ -130,28 +170,25 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
         const delete = document.createElement('button');
         delete.appendChild(new Text('delete'));
         delete.addEventListener('click', () => {
-          if (orgs?.[slug]) {
-            delete orgs[slug];
-          }
-          vscode.postMessage({ updateOrgs: orgs });
-          item.remove();
+          vscode.postMessage({ deleteOrg: slug });
         });
         item.appendChild(delete);
+        document.getElementById('orgs').insertBefore(
+          item,
+          document.getElementById('add-org')
+        );
       }
-      window.addEventListener('message', (event) => {
-        if (Object.hasKey(event.data, 'initOrgs') && event.data.initOrgs instanceof Object) {
-          document.getElementById('loading')?.remove();
-          orgs = event.data.initOrgs ?? {};
-          Object.keys(orgs).forEach(addOrg);
-        }
-      });
+      ${JSON.stringify(Object.keys(orgs) || [])}.forEach(addOrg);
       document.getElementById('add-org-button').addEventListener('click', () => {
-        const slug = document.getElementById('new-org-slug').value;
+      ev.preventDefault();  
+      const slug = document.getElementById('new-org-slug').value;
         const key = document.getElementById('new-org-key').value;
         if (slug && key) {
-          vscode.postMessage{{ updateOrgs: { ...orgs, []} });
+          vscode.postMessage{{ addOrg: { slug, key } });
+          addOrg(slug);
         } else {
           // TODO: error handling
+          console.error('slug or key missing');
         }
       });
     })(acquireVsCodeApi());
@@ -283,7 +320,7 @@ export function activate(context: vscode.ExtensionContext) {
       );
       initView.webview.html = createInitViewHTML(
         orgsKeys,
-        vscode.workspace.workspaceFolders?.map(({uri}) => uri.toString(true)) ?? ['no folders found']
+        vscode.workspace.workspaceFolders?.map(({name}) => name) ?? ['no folders found']
       );
       context.subscriptions.push(initView);
 
