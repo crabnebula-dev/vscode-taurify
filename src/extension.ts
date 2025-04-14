@@ -34,11 +34,14 @@ function escapeHtml(text: string) {
 }
 
 function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
+  const scriptNonce = getNonce();
+  const styleNonce = getNonce();
   return `<!doctype html>
 <html>
 <head>
   <title>Taurify: Initialization</title>
-  <style>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${styleNonce}'; script-src 'nonce-${scriptNonce}';" />
+  <style type="text/css" nonce="${styleNonce}">
     ul { list-style: none; padding: 0; }
     h2 { padding: 10px 0px 0px 10px; }
     li { padding: 10px; }
@@ -48,6 +51,21 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
     fieldset label { display: inline-block; }
     fieldset label + label { margin-left: 10px; }
     input[type="text"], input[type="password"], textarea { min-width: 16rem; }
+    input[type="checkbox"] {
+      appearance: none;
+      border: none;
+      background: inherit;
+      width: 1.2rem;
+      height: 1.2rem;
+      background: var(--vscode-settings-textInputBackground, inherit);
+      display: inline-block;
+      vertical-align: -0.5rem;
+    }
+    input[type="checkbox"]:checked::before {
+      content: '\\2713';
+      position: absolute;
+      margin: -0.1rem 0 0 -0.1rem;
+    }
     input, select, textarea { background: var(--vscode-settings-textInputBackground, inherit); color: inherit; border: none; padding: 4px 6px; }
     input:focus, select:focus, textarea:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
     button { background: var(--vscode-button-background, inherit); color: inherit; border: none; padding: 4px; font: inherit; }
@@ -160,11 +178,15 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
       <button id="add-org-button">Add org</button>
     </li>
   </ul>
-  <script type="text/javascript" nonce="${getNonce()}">
+  <script type="text/javascript" nonce="${scriptNonce}">
     ((vscode) => {
       document.getElementById('init-form').addEventListener('submit', (ev) => {
         ev.preventDefault();
-        console.log(new FormData(ev.target));
+        // TODO: validation
+        const formData = new FormData(ev.target);
+        const initData = Object.fromEntries(formData.entries());
+        initData.platforms = formData.getAll('platforms');
+        vscode.postMessage({ init: initData });
       });
       function addOrg(slug) {
         const option = document.createElement('option');
@@ -300,7 +322,7 @@ export function activate(context: vscode.ExtensionContext) {
       );
       context.subscriptions.push(initView);
 
-      initView.webview.onDidReceiveMessage(({ addOrg, deleteOrg }) => {
+      initView.webview.onDidReceiveMessage(({ addOrg, deleteOrg, init }) => {
         let change = false;
         if (addOrg) {
           const { slug, key } = addOrg;
@@ -311,44 +333,21 @@ export function activate(context: vscode.ExtensionContext) {
           delete orgsKeys[deleteOrg];
           context.secrets.store(ORGS_SECRET_STORAGE_KEY, JSON.stringify(orgsKeys));
         }
+        if (init) {
+          console.log(init);
+          /*
+          const {
+            productName, identifier, appSlug, orgSlug, projectPath, icon, platforms, 
+            packageManager, password, runBeforeDev, runBeforeBuild, bootstrap
+          } = init;
+          const initCall = await runAbortable(
+            `echo npx taurify init --product-name "${productName}" --indentifier "${identifier}" --org-slug "${orgSlug}" --app-slug "${appSlug}" --project-path "${projectPath}" --icon "${icon}" --platforms ${platforms} --package-manager ${packageManager} --password ${password} --runBeforeDev "${runBeforeDev}" --runBeforeBuild "${runBeforeBuild}" --bootstrap ${bootstrap}`,
+            { env: { CN_API_KEY: orgsKeys[orgSlug] } }
+          );
+          context.subscriptions.push(initCall);
+          */
+        }
       });
-
-      const orgSlugs = Object.keys(orgsKeys).filter(
-        (key) => key !== "myOrgSlug"
-      );
-      let orgSlug = orgSlugs.length === 1 ? orgSlugs[0] : undefined;
-      if (orgSlugs.length === 0) {
-        
-        return;
-      } else if (orgSlugs.length > 1) {
-        orgSlug = await vscode.window.showQuickPick(orgSlugs, {
-          title: "Select your organization",
-        });
-      }
-      if (!orgSlug) {
-        vscode.window.showErrorMessage(
-          "Org slug missing. Please select an org slug to initialize your taurify project."
-        );
-        return;
-      }
-      // TODO Custom View for configuration
-      const productName = "";
-      const identifier = "";
-      const appSlug = "";
-      const projectPath = vscode.workspace.workspaceFolders?.[0].uri;
-      const icon = "";
-      const platforms = "";
-      const packageManager = "";
-      const password = "";
-      const runBeforeDev = "";
-      const runBeforeBuild = "";
-      const bootstrap = false;
-
-      const initCall = await runAbortable(
-        `echo npx taurify init --product-name "${productName}" --indentifier "${identifier}" --org-slug "${orgSlug}" --app-slug "${appSlug}" --project-path "${projectPath}" --icon "${icon}" --platforms ${platforms} --package-manager ${packageManager} --password ${password} --runBeforeDev "${runBeforeDev}" --runBeforeBuild "${runBeforeBuild}" --bootstrap ${bootstrap}`,
-        { env: { CN_API_KEY: orgsKeys[orgSlug] } }
-      );
-      context.subscriptions.push(initCall);
     }
   );
   context.subscriptions.push(initCommand);
