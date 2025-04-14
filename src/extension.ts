@@ -300,8 +300,34 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
-  // const initViewProvider = new InitViewProvider(context.extensionUri, context.secrets);
-  // const initView = vscode.window.registerWebviewViewProvider(InitViewProvider.viewType, initViewProvider);
+  async function getOrg() {
+    try {
+      const config = await vscode.workspace.findFiles("taurify.json");
+      let dataFile = config.length === 1 ? config[0] : undefined;
+      if (config.length === 0) {
+        throw new Error('No config found');
+      }
+      if (!dataFile) {
+        // TODO multiple taurify.json selection
+        throw new Error('No config found');
+      }
+      // TODO: read datafile
+      // let configData = JSON.parse(await vscode.workspace.fs.readFile(dataFile) || '{}');
+    } catch(e: unknown) {
+      console.error(e);
+      vscode.window.showErrorMessage('Unable to read the org slug from the config.', {},
+        ...(`${e}` === 'No config found' ? ['vscode-taurify.init'] : []));
+    }
+    return "";
+  }
+
+  getOrg();
+
+  async function getEnv() {
+    const orgSlug = await getOrg();
+    const orgsKeys = JSON.parse(await context.secrets.get(ORGS_SECRET_STORAGE_KEY) || '{}');
+    return { env: { CN_API_KEY: orgsKeys[orgSlug] } };
+  }
 
   const initCommand = vscode.commands.registerCommand(
     "vscode-taurify.init",
@@ -339,17 +365,16 @@ export function activate(context: vscode.ExtensionContext) {
         }
         if (init) {
           console.log(init);
-          /*
           const {
             productName, identifier, appSlug, orgSlug, projectPath, icon, platforms, 
             packageManager, password, runBeforeDev, runBeforeBuild, bootstrap
           } = init;
-          const initCall = await runAbortable(
-            `echo npx taurify init --product-name "${productName}" --indentifier "${identifier}" --org-slug "${orgSlug}" --app-slug "${appSlug}" --project-path "${projectPath}" --icon "${icon}" --platforms ${platforms} --package-manager ${packageManager} --password ${password} --runBeforeDev "${runBeforeDev}" --runBeforeBuild "${runBeforeBuild}" --bootstrap ${bootstrap}`,
-            { env: { CN_API_KEY: orgsKeys[orgSlug] } }
-          );
-          context.subscriptions.push(initCall);
-          */
+          runAbortable(
+            `echo npx taurify init --product-name "${productName}" --indentifier "${identifier
+              }" --org-slug "${orgSlug}" --app-slug "${appSlug}" --project-path "${projectPath}" --icon "${icon
+              }" --platforms ${platforms.join(' ')} --package-manager ${packageManager} --password ${password
+              } --runBeforeDev "${runBeforeDev}" --runBeforeBuild "${runBeforeBuild}"${bootstrap ? ' --bootstrap' : ''}`            
+          ).then((initCall) => context.subscriptions.push(initCall));
         }
       });
     }
@@ -358,7 +383,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   const devCommand = vscode.commands.registerCommand(
     "vscode-taurify.dev",
-    async () => {
+    async () => {      
       const devCall = await runAbortable("npx taurify dev");
       context.subscriptions.push(devCall);
     }
@@ -377,7 +402,9 @@ export function activate(context: vscode.ExtensionContext) {
   const buildCommand = vscode.commands.registerCommand(
     "vscode-taurify.build",
     async () => {
-      const buildCall = await runAbortable("npx taurify build");
+      const orgSlug = getOrg();    
+      const orgsKeys = JSON.parse(await context.secrets.get(ORGS_SECRET_STORAGE_KEY) || '{}');
+      const buildCall = await runAbortable("npx taurify build"/*, getEnv() */);
       context.subscriptions.push(buildCall);
     }
   );
@@ -386,7 +413,7 @@ export function activate(context: vscode.ExtensionContext) {
   const updateCommand = vscode.commands.registerCommand(
     "vscode-taurify.update",
     async () => {
-      const updateCall = await runAbortable("npx taurify update");
+      const updateCall = await runAbortable("npx taurify update"/*, getEnv() */);
       context.subscriptions.push(updateCall);
     }
   );
