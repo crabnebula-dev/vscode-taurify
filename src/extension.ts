@@ -17,6 +17,7 @@ const runAbortable = async (
   command: string,
   options: ObjectEncodingOptions & ExecOptions = {}
 ) => {
+  console.log(options);
   const abort = new AbortController();
   const process = await exec(command, { ...options, signal: abort.signal });
   const { stdout, stderr } = process;
@@ -300,33 +301,47 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
-  async function getOrg() {
+  async function getOrg(command: string) {
     try {
       const config = await vscode.workspace.findFiles("taurify.json");
       let dataFile = config.length === 1 ? config[0] : undefined;
       if (config.length === 0) {
         throw new Error('No config found');
       }
+      if (config.length > 1) {
+        const dataPath = await vscode.window.showQuickPick(config.map((uri) => uri.path));
+        dataFile = config.find(({ path }) => path === dataPath);
+      }
       if (!dataFile) {
-        // TODO multiple taurify.json selection
         throw new Error('No config found');
       }
-      // TODO: read datafile
-      // let configData = JSON.parse(await vscode.workspace.fs.readFile(dataFile) || '{}');
+      const configFile = await vscode.workspace.fs.readFile(dataFile);
+      if (!configFile) {
+        throw new Error('Cannot read config');
+      }
+      const configData = JSON.parse(new TextDecoder().decode(configFile) || 'null');
+      if (!configData) {
+        throw new Error('Cannot decode config');
+      }
+      return configData.cloudOrgSlug;
     } catch(e: unknown) {
-      console.error(e);
-      vscode.window.showErrorMessage('Unable to read the org slug from the config.', {},
-        ...(`${e}` === 'No config found' ? ['vscode-taurify.init'] : []));
+      vscode.window.showErrorMessage(`Unable to read the org slug from the config: ${e}`, {},
+        'vscode-taurify.init', command);
     }
     return "";
   }
 
-  getOrg();
-
-  async function getEnv() {
-    const orgSlug = await getOrg();
-    const orgsKeys = JSON.parse(await context.secrets.get(ORGS_SECRET_STORAGE_KEY) || '{}');
-    return { env: { CN_API_KEY: orgsKeys[orgSlug] } };
+  async function getEnv(command: string) {
+    const orgSlug = await getOrg(command);
+    if (!orgSlug) { return; }
+    try {
+      const orgsKeys = JSON.parse(await context.secrets.get(ORGS_SECRET_STORAGE_KEY) || '{}');
+      return { env: { CN_API_KEY: orgsKeys[orgSlug] } };
+    } catch(e) {
+      vscode.window.showErrorMessage(`Unable to get the API key for the configured org: ${e}`, {},
+        'vscode-taurify.init', command);
+    }
+    return null;
   }
 
   const initCommand = vscode.commands.registerCommand(
@@ -402,9 +417,9 @@ export function activate(context: vscode.ExtensionContext) {
   const buildCommand = vscode.commands.registerCommand(
     "vscode-taurify.build",
     async () => {
-      const orgSlug = getOrg();    
-      const orgsKeys = JSON.parse(await context.secrets.get(ORGS_SECRET_STORAGE_KEY) || '{}');
-      const buildCall = await runAbortable("npx taurify build"/*, getEnv() */);
+      const options = await getEnv("vscode-taurify.build");
+      if (!options) { return; }
+      const buildCall = await runAbortable("npx taurify build", options);
       context.subscriptions.push(buildCall);
     }
   );
@@ -413,31 +428,16 @@ export function activate(context: vscode.ExtensionContext) {
   const updateCommand = vscode.commands.registerCommand(
     "vscode-taurify.update",
     async () => {
-      const updateCall = await runAbortable("npx taurify update"/*, getEnv() */);
+      const options = await getEnv("vscode-taurify.build");
+      if (!options) { return; }
+      const updateCall = await runAbortable("npx taurify update", options);
       context.subscriptions.push(updateCall);
     }
   );
   context.subscriptions.push(updateCommand);
-
-  /*
-
-	const disposable = vscode.commands.registerCommand('vscode-taurify.taurify', () => {
-		// if not present, show a convenient GUI around `npx taurify init` to create taurify.json
-		// load settings: organization API key
-		// if ios or android builds are selected, check for signing keys
-		// if no signing keys are present, open the settings and the pages where you can apply for them
-		// if organization API key is not present, open the settings and at the same time the page where you would get the API key if you are already logged in
-		// actually start taurify and send actual update information
-		showProgress(Math.floor(Math.random() * 101));
-	});
-
-	context.subscriptions.push(disposable);
-	*/
 }
 
-export function deactivate() {
-  // TOOO: stop taurification process if possible
-}
+export function deactivate() {}
 
 function getNonce() {
 	let text = '';
