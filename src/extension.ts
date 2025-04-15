@@ -93,12 +93,7 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
         <label for="org-slug">Organization slug</label>
         <p>The identifier for the organization in your Cloud account. You can <a href="#new-org-slug">add organizations</a> below.</p>
         <select id="org-slug" name="orgSlug" placeholder="No orgs configured" required>
-          ${((orgSlugs) => orgSlugs.length
-            ? orgSlugs.map(slug => `<option value="${escapeAttr(slug)}">
-                ${escapeHtml(slug)}
-              </option>`).join('\n')
-            : '<option id="no-orgs" value="">Please add your organization below</option>'
-          )(Object.keys(orgs))}
+          <option id="no-orgs" value="">Please add your organization below</option>
         </select>
       </li>
       <li>
@@ -243,7 +238,6 @@ function showProgress(progress: number) {
 
 export function activate(context: vscode.ExtensionContext) {
   const config = vscode.workspace.getConfiguration('taurify');
-  const packageRunner = config.get('packageRunner');
 
   statusBarItem = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Left,
@@ -413,7 +407,8 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('No taurify.json found in workspace. Initialize your project first', 'vscode-taurify.init');
         return;
       }
-      const devCall = await runAbortable(`${getRunner()} taurify dev`);
+      const options = await getEnv("vscode-taurify.build");
+      const devCall = await runAbortable(`${getRunner()} taurify dev`, options ?? undefined);
       context.subscriptions.push(devCall);
     }
   );
@@ -426,7 +421,8 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('No taurify.json found in workspace. Initialize your project first', 'vscode-taurify.init');
         return;
       }
-      const runCall = await runAbortable(`${getRunner()} taurify run`);
+      const options = await getEnv("vscode-taurify.build");
+      const runCall = await runAbortable(`${getRunner()} taurify run`, options ?? undefined);
       context.subscriptions.push(runCall);
     }
   );
