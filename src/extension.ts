@@ -336,10 +336,16 @@ export function activate(context: vscode.ExtensionContext) {
       console.log('enabled logging');
     }
     const abort = new AbortController();
-    const process = await exec(command, { ...options, signal: abort.signal });
+    const process = Object.assign(
+      await exec(command, { ...options, signal: abort.signal }),
+      { lastError: null }
+    );
     const { stdout, stderr } = process;
     stdout?.on("data", (chunk) => outputChannel.append(chunk.toString()));
-    stderr?.on("data", (chunk) => outputChannel.append(chunk.toString()));
+    stderr?.on("data", (chunk) => {
+      outputChannel.append(chunk.toString());
+      process.lastError = chunk.toString();
+    });
     
     return Object.assign(new vscode.Disposable(() => abort.abort()), { process });
   };
@@ -382,6 +388,7 @@ export function activate(context: vscode.ExtensionContext) {
           context.secrets.store(ORGS_SECRET_STORAGE_KEY, JSON.stringify(orgsKeys));
         }
         if (init) {
+          statusBarItem.text = 'Taurify: initializing...';
           const {
             productName, identifier, appSlug, orgSlug, projectPath, icon, platforms, 
             packageManager, password, runBeforeDev, runBeforeBuild, bootstrap
@@ -393,7 +400,17 @@ export function activate(context: vscode.ExtensionContext) {
               }" --project-path "${projectPath}" --icon "${icon}" --platforms ${platforms.join(' ')
               } --package-manager ${packageManager} --password ${password} --runBeforeDev "${runBeforeDev
               }" --runBeforeBuild "${runBeforeBuild}"${bootstrap ? ' --bootstrap' : ''}`
-          ).then((initCall) => context.subscriptions.push(initCall));
+          ).then((initCall) => { 
+            context.subscriptions.push(initCall);
+            initCall.process.on('exit', (code) => {
+              if (statusBarItem.text === 'Taurify: initializing...') {
+                statusBarItem.text = 'Taurify';
+              }
+              if ((code ?? 0) > 0) {
+                vscode.window.showErrorMessage(`Taurify initialization failed: ${initCall.process.lastError}`);
+              }
+            });
+          });
         }
       });
     }
