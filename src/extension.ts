@@ -13,19 +13,6 @@ let statusBarItem: vscode.StatusBarItem;
 
 const outputChannel = vscode.window.createOutputChannel("Taurify");
 
-const runAbortable = async (
-  command: string,
-  options: ObjectEncodingOptions & ExecOptions = {}
-) => {
-  console.log(options);
-  const abort = new AbortController();
-  const process = await exec(command, { ...options, signal: abort.signal });
-  const { stdout, stderr } = process;
-  stdout?.on("data", (chunk) => outputChannel.append(chunk.toString()));
-  stderr?.on("data", (chunk) => outputChannel.append(chunk.toString()));
-  return Object.assign(new vscode.Disposable(() => abort.abort()), { process });
-};
-
 function escapeAttr(text: string) {
   return text.replace(/(?:^|[^\\])(?:\\\\)*\\"/g, '\\"');
 }
@@ -254,31 +241,17 @@ function showProgress(progress: number) {
   }
 }
 
-// TODO: use secret storage to store org slugs and api keys
-
-/*
-Configuration: 
-
-organization API key (key-value based on org slug to handle multiple orgs)
-android/ios app signing keys based on org slug
-path to cn / cn.exe
-*/
-
-function noConfigFound() {
-  statusBarItem!.text = "TODO: Taurify";
-  statusBarItem!.command = "vscode-taurify.init";
-  statusBarItem!.tooltip =
-    "## Initialize this project with Taurify\n\nIf you click this status applet, your web app will be automatically converted to a tauri app.";
-}
-
 export function activate(context: vscode.ExtensionContext) {
+  const config = vscode.workspace.getConfiguration('taurify');
+  const packageRunner = config.get('packageRunner');
+
   statusBarItem = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Left,
     0
   );
   context.subscriptions.push(statusBarItem);
   statusBarItem.accessibilityInformation = { role: "button", label: "Taurify" };
-  statusBarItem.show();
+  
   statusBarItem.text = "Taurify";
   statusBarItem.command = {
     title: "Taurify commands",
@@ -286,24 +259,30 @@ export function activate(context: vscode.ExtensionContext) {
     arguments: [">Taurify"],
   };
 
-  // check for taurify.json in project root
-  vscode.workspace.findFiles("taurify.json").then(
-    (found) => {
-      if (found.length) {
-        statusBarItem!.text = "Taurify";
-      } else {
-        noConfigFound();
-      }
-    },
-    (error) => {
-      console.error("taurify", error);
-      noConfigFound();
+  const handleStatusBarVisibility = () => {
+    if (config.inspect('showStatusBarApplet')?.globalValue !== false) {
+      statusBarItem.show();
+    } else {
+      statusBarItem.hide();
     }
-  );
+  };
+  handleStatusBarVisibility();
+  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((ev) => { 
+    if (ev.affectsConfiguration('taurify.showStatusBarApplet')) {
+      handleStatusBarVisibility();
+    }
+  }));
 
-  async function getOrg(command: string) {
+  async function findConfig() {
+    return await vscode.workspace.findFiles("taurify.json");
+  }
+
+  let project = { hasConfig: false };
+  findConfig().then((config) => { project.hasConfig = config.length > 0; });
+
+  async function getConfig(): Promise<{ cloudOrgSlug: string, [key: string]: unknown }> {
     try {
-      const config = await vscode.workspace.findFiles("taurify.json");
+      const config = await findConfig();
       let dataFile = config.length === 1 ? config[0] : undefined;
       if (config.length === 0) {
         throw new Error('No config found');
@@ -323,12 +302,18 @@ export function activate(context: vscode.ExtensionContext) {
       if (!configData) {
         throw new Error('Cannot decode config');
       }
-      return configData.cloudOrgSlug;
+      return configData;
     } catch(e: unknown) {
-      vscode.window.showErrorMessage(`Unable to read the org slug from the config: ${e}`, {},
-        'vscode-taurify.init', command);
+      throw new Error(`Unable to read the taurify config: ${e}`);
     }
-    return "";
+  }
+
+  async function getOrg(command: string) {
+    try {
+      return (await getConfig())?.cloudOrgSlug;
+    } catch(e) {
+      vscode.window.showErrorMessage(`${e}`, {}, 'vscode-taurify.init', command);
+    }
   }
 
   async function getEnv(command: string) {
@@ -344,6 +329,27 @@ export function activate(context: vscode.ExtensionContext) {
     return null;
   }
 
+  function getRunner() {
+    const runnerConfig = config.inspect('packageRunner')
+    return runnerConfig?.globalValue || runnerConfig?.workspaceValue || runnerConfig?.defaultValue || 'npx';
+  }
+
+  async function runAbortable(
+    command: string,
+    options: ObjectEncodingOptions & ExecOptions = {},
+  ) {
+    if (config.inspect('enableLogs')?.globalValue) {
+      console.log('enabled logging');
+    }
+    const abort = new AbortController();
+    const process = await exec(command, { ...options, signal: abort.signal });
+    const { stdout, stderr } = process;
+    stdout?.on("data", (chunk) => outputChannel.append(chunk.toString()));
+    stderr?.on("data", (chunk) => outputChannel.append(chunk.toString()));
+    
+    return Object.assign(new vscode.Disposable(() => abort.abort()), { process });
+  };
+
   const initCommand = vscode.commands.registerCommand(
     "vscode-taurify.init",
     async () => {
@@ -354,7 +360,11 @@ export function activate(context: vscode.ExtensionContext) {
         console.warn('taurify: orgs secret keys were corrupted');
         orgsKeys = {};
       }
-      console.log('open init view');
+      if (project.hasConfig) {
+        vscode.window.showWarningMessage(
+          'You already have a configured project. Make sure you do not override settings you still need.'
+        );
+      }
       const initView = vscode.window.createWebviewPanel(
         "taurify.initview",
         "Taurify",
@@ -368,7 +378,6 @@ export function activate(context: vscode.ExtensionContext) {
       context.subscriptions.push(initView);
 
       initView.webview.onDidReceiveMessage(({ addOrg, deleteOrg, init }) => {
-        let change = false;
         if (addOrg) {
           const { slug, key } = addOrg;
           orgsKeys[slug] = key;
@@ -379,16 +388,17 @@ export function activate(context: vscode.ExtensionContext) {
           context.secrets.store(ORGS_SECRET_STORAGE_KEY, JSON.stringify(orgsKeys));
         }
         if (init) {
-          console.log(init);
           const {
             productName, identifier, appSlug, orgSlug, projectPath, icon, platforms, 
             packageManager, password, runBeforeDev, runBeforeBuild, bootstrap
           } = init;
+
           runAbortable(
-            `echo npx taurify init --product-name "${productName}" --indentifier "${identifier
-              }" --org-slug "${orgSlug}" --app-slug "${appSlug}" --project-path "${projectPath}" --icon "${icon
-              }" --platforms ${platforms.join(' ')} --package-manager ${packageManager} --password ${password
-              } --runBeforeDev "${runBeforeDev}" --runBeforeBuild "${runBeforeBuild}"${bootstrap ? ' --bootstrap' : ''}`            
+            `echo ${getRunner()} taurify init --product-name "${productName
+              }" --indentifier "${identifier}" --org-slug "${orgSlug}" --app-slug "${appSlug
+              }" --project-path "${projectPath}" --icon "${icon}" --platforms ${platforms.join(' ')
+              } --package-manager ${packageManager} --password ${password} --runBeforeDev "${runBeforeDev
+              }" --runBeforeBuild "${runBeforeBuild}"${bootstrap ? ' --bootstrap' : ''}`
           ).then((initCall) => context.subscriptions.push(initCall));
         }
       });
@@ -398,8 +408,12 @@ export function activate(context: vscode.ExtensionContext) {
 
   const devCommand = vscode.commands.registerCommand(
     "vscode-taurify.dev",
-    async () => {      
-      const devCall = await runAbortable("npx taurify dev");
+    async () => {
+      if (!project.hasConfig) {
+        vscode.window.showErrorMessage('No taurify.json found in workspace. Initialize your project first', 'vscode-taurify.init');
+        return;
+      }
+      const devCall = await runAbortable(`${getRunner()} taurify dev`);
       context.subscriptions.push(devCall);
     }
   );
@@ -408,7 +422,11 @@ export function activate(context: vscode.ExtensionContext) {
   const runCommand = vscode.commands.registerCommand(
     "vscode-taurify.run",
     async () => {
-      const runCall = await runAbortable("npx taurify run");
+      if (!project.hasConfig) {
+        vscode.window.showErrorMessage('No taurify.json found in workspace. Initialize your project first', 'vscode-taurify.init');
+        return;
+      }
+      const runCall = await runAbortable(`${getRunner()} taurify run`);
       context.subscriptions.push(runCall);
     }
   );
@@ -417,9 +435,13 @@ export function activate(context: vscode.ExtensionContext) {
   const buildCommand = vscode.commands.registerCommand(
     "vscode-taurify.build",
     async () => {
+      if (!project.hasConfig) {
+        vscode.window.showErrorMessage('No taurify.json found in workspace. Initialize your project first', 'vscode-taurify.init');
+        return;
+      }
       const options = await getEnv("vscode-taurify.build");
       if (!options) { return; }
-      const buildCall = await runAbortable("npx taurify build", options);
+      const buildCall = await runAbortable(`${getRunner()} taurify build`, options);
       context.subscriptions.push(buildCall);
     }
   );
@@ -428,9 +450,13 @@ export function activate(context: vscode.ExtensionContext) {
   const updateCommand = vscode.commands.registerCommand(
     "vscode-taurify.update",
     async () => {
-      const options = await getEnv("vscode-taurify.build");
+      if (!project.hasConfig) {
+        vscode.window.showErrorMessage('No taurify.json found in workspace. Initialize your project first', 'vscode-taurify.init');
+        return;
+      }
+      const options = await getEnv("vscode-taurify.update");
       if (!options) { return; }
-      const updateCall = await runAbortable("npx taurify update", options);
+      const updateCall = await runAbortable(`${getRunner()} taurify update`, options);
       context.subscriptions.push(updateCall);
     }
   );

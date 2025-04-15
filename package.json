@@ -41,17 +41,22 @@
         "taurify.showStatusBarApplet": {
           "type": "boolean",
           "default": true,
-          "description": "Show/Hide status bar applet"
+          "description": "Show the status bar applet"
         },
         "taurify.enableLogs": {
           "type": "boolean",
           "default": true,
-          "description": "Enable/disable writing logs"
+          "description": "Enable writing logs"
         },
         "taurify.logFile": {
           "type": "string",
           "default": ".taurify/taurify.log",
-          "description": "file to write log data to"
+          "description": "File to write log output to"
+        },
+        "taurify.packageRunner": {
+          "type": "string",
+          "default": "npx",
+          "description": "JS package runner (e.g. `npx`, `pnpx`, `bunx`)"
         }
       }
     }
