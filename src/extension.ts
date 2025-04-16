@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { exec, ExecOptions } from "node:child_process";
 import { ObjectEncodingOptions } from "node:fs";
+import { FileHandle, open } from "node:fs/promises";
 
 const ORGS_SECRET_STORAGE_KEY = 'taurify-orgs';
 
@@ -120,7 +121,7 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
       <li>
         <label for="package-manager">Package manager</label>
         <p>The package manager your front-end uses.</p>
-        <select id="package-manager" name="packageManger">
+        <select id="package-manager" name="packageManager">
           <option value="npm">npm</option>
           <option value="pnpm">pnpm</option>
           <option value="yarn">yarn</option>
@@ -324,29 +325,55 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   function getRunner() {
-    const runnerConfig = config.inspect('packageRunner')
+    const runnerConfig = config.inspect('packageRunner');
     return runnerConfig?.globalValue || runnerConfig?.workspaceValue || runnerConfig?.defaultValue || 'npx';
   }
 
   async function runAbortable(
     command: string,
     options: ObjectEncodingOptions & ExecOptions = {},
+    secrets: string[] = []
   ) {
+    let logFile: FileHandle;
     if (config.inspect('enableLogs')?.globalValue) {
-      console.log('enabled logging');
+      let logFileName = config.inspect('logFile')?.globalValue;
+      if (typeof logFileName === 'string') {
+        console.log(`enabled logging to file ${logFileName}`);
+        logFile = await open(logFileName, 'a');
+      }
     }
+    let secretFilter;
+    const filterSecrets = (data: string) => {
+      if (!secrets.length) {
+        return data;
+      }
+      secretFilter ??= new RegExp(`\\b(${
+        secrets.map(secret => secret.replace(/[\\\|+*?(){}[\]]/g, '\\$1')).join('|')
+      })\\b`, 'g');
+      return data.replace(secretFilter, '********');
+    };
     const abort = new AbortController();
     const process = Object.assign(
       await exec(command, { ...options, signal: abort.signal }),
-      { lastError: null }
+      { lastError: null as null | string }
     );
+    process.on('worker', () => logFile?.appendFile(
+      `[run ${new Date().toISOString()}] ${filterSecrets(command)}`,
+      'utf-8'
+    ));
     const { stdout, stderr } = process;
-    stdout?.on("data", (chunk) => outputChannel.append(chunk.toString()));
-    stderr?.on("data", (chunk) => {
-      outputChannel.append(chunk.toString());
-      process.lastError = chunk.toString();
+    stdout?.on("data", (chunk) => {
+      const output = filterSecrets(chunk.toString());
+      outputChannel.append(output);
+      logFile?.appendFile(`[log ${new Date().toISOString()}] ${output}\n`, 'utf-8');
     });
-    
+    stderr?.on("data", (chunk) => {
+      const output = filterSecrets(chunk.toString());
+      outputChannel.append(output);
+      process.lastError = output;
+      logFile?.appendFile(`[err ${new Date().toISOString()}] ${output}\n`, 'utf-8');
+    });
+    process.on('exit', () => logFile?.close());
     return Object.assign(new vscode.Disposable(() => abort.abort()), { process });
   };
 
@@ -395,8 +422,8 @@ export function activate(context: vscode.ExtensionContext) {
           } = init;
 
           runAbortable(
-            `echo ${getRunner()} taurify init --product-name "${productName
-              }" --indentifier "${identifier}" --org-slug "${orgSlug}" --app-slug "${appSlug
+            `${getRunner()} taurify init --product-name "${productName
+              }" --identifier "${identifier}" --org-slug "${orgSlug}" --app-slug "${appSlug
               }" --project-path "${projectPath}" --icon "${icon}" --platforms ${platforms.join(' ')
               } --package-manager ${packageManager} --password ${password} --runBeforeDev "${runBeforeDev
               }" --runBeforeBuild "${runBeforeBuild}"${bootstrap ? ' --bootstrap' : ''}`
