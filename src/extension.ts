@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { exec, ExecOptions } from "node:child_process";
 import { ObjectEncodingOptions } from "node:fs";
 import { FileHandle, open } from "node:fs/promises";
+import { env } from 'node:process';
 
 const ORGS_SECRET_STORAGE_KEY = 'taurify-orgs';
 
@@ -102,10 +103,10 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
         <p>The platform(s) for which binaries should be created.</p>
         <fieldset id="platforms">
           <label for="platform-mac">Mac OS
-            <input type="checkbox" id="platform-mac" name="platforms" value="mac" />
+            <input type="checkbox" id="platform-mac" name="platforms" value="macos" />
           </label>
           <label for="platform-windows">Windows
-            <input type="checkbox" id="platform-windows" name="platforms" value="win" />
+            <input type="checkbox" id="platform-windows" name="platforms" value="windows" />
           </label>
           <label for="platform-linux">Linux
             <input type="checkbox" id="platform-linux" name="platforms" value="linux" />
@@ -131,6 +132,11 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
         <label for="password">Password</label>
         <p>A hidden passphrase to create a key pair for your application to sign updates.</p>
         <input type="password" id="password" name="password" required />
+      </li>
+      <li>
+        <label for="dev-url">Development server URL</label>
+        <p>The URL on which the development server listens, e.g. http://localhost:3000.</p>
+        <input type="url" id="dev-url" name="devUrl" required />
       </li>
       <li>
         <label for="run-before-dev">Run before dev</label>
@@ -214,6 +220,7 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
       document.querySelector('a[href="#new-org-slug"]').addEventListener('click', () => {
         document.getElementById('new-org-slug').focus();
       });
+      document.getElementById('project-path').focus();
     })(acquireVsCodeApi());
   </script>
 </body>
@@ -273,7 +280,10 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   let project = { hasConfig: false };
-  findConfig().then((config) => { project.hasConfig = config.length > 0; });
+  findConfig().then((config) => {
+    project.hasConfig = config.length > 0;
+    return config;
+  });
 
   async function getConfig(): Promise<{ cloudOrgSlug: string, [key: string]: unknown }> {
     try {
@@ -316,7 +326,7 @@ export function activate(context: vscode.ExtensionContext) {
     if (!orgSlug) { return; }
     try {
       const orgsKeys = JSON.parse(await context.secrets.get(ORGS_SECRET_STORAGE_KEY) || '{}');
-      return { env: { CN_API_KEY: orgsKeys[orgSlug] } };
+      return { env: { ...env, CN_API_KEY: orgsKeys[orgSlug] } };
     } catch(e) {
       vscode.window.showErrorMessage(`Unable to get the API key for the configured org: ${e}`, {},
         'vscode-taurify.init', command);
@@ -332,7 +342,8 @@ export function activate(context: vscode.ExtensionContext) {
   async function runAbortable(
     command: string,
     options: ObjectEncodingOptions & ExecOptions = {},
-    secrets: string[] = []
+    secrets: string[] = [],
+    runInTerminal?: vscode.TerminalOptions,
   ) {
     let logFile: FileHandle;
     if (config.inspect('enableLogs')?.globalValue) {
@@ -352,9 +363,14 @@ export function activate(context: vscode.ExtensionContext) {
       })\\b`, 'g');
       return data.replace(secretFilter, '********');
     };
+    if (runInTerminal) {
+      const terminal = vscode.window.createTerminal({ name: "taurify-init", ...runInTerminal });
+      terminal.sendText(command, true);
+      return Object.assign(terminal, { process: { on: () => undefined, lastError: null } });
+    }
     const abort = new AbortController();
     const process = Object.assign(
-      await exec(command, { ...options, signal: abort.signal }),
+      exec(command, { ...options, signal: abort.signal }),
       { lastError: null as null | string }
     );
     process.on('worker', () => logFile?.appendFile(
@@ -418,15 +434,21 @@ export function activate(context: vscode.ExtensionContext) {
           statusBarItem.text = 'Taurify: initializing...';
           const {
             productName, identifier, appSlug, orgSlug, projectPath, icon, platforms, 
-            packageManager, password, runBeforeDev, runBeforeBuild, bootstrap
+            packageManager, password, devUrl, runBeforeDev, runBeforeBuild, bootstrap
           } = init;
+
+          const resolvedProjectPath = vscode.workspace.workspaceFolders?.find(({ name }) => name === projectPath)?.uri.path;
 
           runAbortable(
             `${getRunner()} taurify init --product-name "${productName
               }" --identifier "${identifier}" --org-slug "${orgSlug}" --app-slug "${appSlug
-              }" --project-path "${projectPath}" --icon "${icon}" --platforms ${platforms.join(' ')
-              } --package-manager ${packageManager} --password ${password} --runBeforeDev "${runBeforeDev
-              }" --runBeforeBuild "${runBeforeBuild}"${bootstrap ? ' --bootstrap' : ''}`
+              }" --project-path "${resolvedProjectPath}" --icon "${icon}" --platforms ${platforms.join(' ')
+              } --package-manager ${packageManager} --password ${password} --dev-url "${devUrl                
+              }" --run-before-dev "${runBeforeDev}" --run-before-build "${runBeforeBuild
+              }" --bootstrap ${bootstrap || false}`,
+            undefined,
+            [password],
+            { cwd: resolvedProjectPath }
           ).then((initCall) => { 
             context.subscriptions.push(initCall);
             initCall.process.on('exit', (code) => {
@@ -447,12 +469,15 @@ export function activate(context: vscode.ExtensionContext) {
   const devCommand = vscode.commands.registerCommand(
     "vscode-taurify.dev",
     async () => {
+      const configs = await findConfig();
       if (!project.hasConfig) {
         vscode.window.showErrorMessage('No taurify.json found in workspace. Initialize your project first', 'vscode-taurify.init');
         return;
       }
+      // TODO: multi project selection
+      let cwd = configs.length === 1 ? configs[0].path.replace(/taurify.json$/, '') : undefined;
       const options = await getEnv("vscode-taurify.build");
-      const devCall = await runAbortable(`${getRunner()} taurify dev`, options ?? undefined);
+      const devCall = await runAbortable(`${getRunner()} taurify dev`, { cwd, ...(options ?? {}) });
       context.subscriptions.push(devCall);
     }
   );
@@ -461,12 +486,15 @@ export function activate(context: vscode.ExtensionContext) {
   const runCommand = vscode.commands.registerCommand(
     "vscode-taurify.run",
     async () => {
+      const configs = await findConfig();
       if (!project.hasConfig) {
         vscode.window.showErrorMessage('No taurify.json found in workspace. Initialize your project first', 'vscode-taurify.init');
         return;
       }
+      // TODO: multi project selection
+      let cwd = configs.length === 1 ? configs[0].path.replace(/taurify.json$/, '') : undefined;
       const options = await getEnv("vscode-taurify.build");
-      const runCall = await runAbortable(`${getRunner()} taurify run`, options ?? undefined);
+      const runCall = await runAbortable(`${getRunner()} taurify run`, { cwd,  ...(options ?? {}) });
       context.subscriptions.push(runCall);
     }
   );
@@ -475,13 +503,16 @@ export function activate(context: vscode.ExtensionContext) {
   const buildCommand = vscode.commands.registerCommand(
     "vscode-taurify.build",
     async () => {
+      const configs = await findConfig();
       if (!project.hasConfig) {
         vscode.window.showErrorMessage('No taurify.json found in workspace. Initialize your project first', 'vscode-taurify.init');
         return;
       }
+      // TODO: multi project selection
+      let cwd = configs.length === 1 ? configs[0].path.replace(/taurify.json$/, '') : undefined;
       const options = await getEnv("vscode-taurify.build");
       if (!options) { return; }
-      const buildCall = await runAbortable(`${getRunner()} taurify build`, options);
+      const buildCall = await runAbortable(`${getRunner()} taurify build`, { cwd,  ...(options ?? {}) });
       context.subscriptions.push(buildCall);
     }
   );
