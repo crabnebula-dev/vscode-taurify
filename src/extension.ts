@@ -2,7 +2,9 @@ import * as vscode from "vscode";
 import { exec, ExecOptions } from "node:child_process";
 import { ObjectEncodingOptions, read } from "node:fs";
 import { FileHandle, open } from "node:fs/promises";
+import * as path from "node:path";
 import { env } from 'node:process';
+import { homedir } from "node:os";
 
 const ORGS_SECRET_STORAGE_KEY = 'taurify-orgs';
 
@@ -337,11 +339,12 @@ export function activate(context: vscode.ExtensionContext) {
     runInTerminal?: vscode.TerminalOptions,
   ) {
     let logFile: FileHandle;
-    if (config.inspect('enableLogs')?.globalValue) {
+    if (config.inspect('enableLogs')?.globalValue && !runInTerminal) {
       let logFileName = config.inspect('logFile')?.globalValue;
       if (typeof logFileName === 'string') {
-        console.log(`enabled logging to file ${logFileName}`);
-        logFile = await open(logFileName, 'a');
+        const logFileFullPath = path.join(options.cwd?.toString() ?? homedir(), logFileName);
+        console.log(`enabled logging to file ${logFileFullPath}`);
+        logFile = await open(logFileFullPath, 'a');
       }
     }
     let secretFilter;

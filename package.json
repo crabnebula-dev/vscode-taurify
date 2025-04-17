@@ -4,7 +4,7 @@
   "description": "Taurify your web app",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.99.0"
+    "vscode": "^1.97.0"
   },
   "categories": [
     "Other"
@@ -15,7 +15,7 @@
     "commands": [
       {
         "command": "vscode-taurify.init",
-        "title": "Taurify: Init"
+        "title": "Taurify: Initialization"
       },
       {
         "command": "vscode-taurify.dev",
@@ -46,7 +46,7 @@
         "taurify.enableLogs": {
           "type": "boolean",
           "default": true,
-          "description": "Enable writing logs"
+          "description": "Enable writing logs from output (terminal output will not be logged)"
         },
         "taurify.logFile": {
           "type": "string",

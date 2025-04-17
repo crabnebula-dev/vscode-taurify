@@ -1,71 +1,58 @@
-# vscode-taurify README
+# vscode-taurify
 
-This is the README for your extension "vscode-taurify". After writing up a brief description, we recommend including the following sections.
+The extension `vscode-taurify` lets you use [taurify](https://crabnebula.dev/taurify/) from the comfort of your favorite IDE. It enables you to develop and distribute native executables for all major platforms with automated updates using web app techniques.
+
+![vscode-taurify in action, showing the init, dev, run, build, and update commands and the initialization window](./vscode-taurify.png)
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+### Integration
 
-For example if there is an image subfolder under your extension project workspace:
+You will first notice a small `Taurify` status bar applet. If you don't want it, you can disable it in the configuration. Clicking on that applet will show the available taurify commands.
 
-\!\[feature X\]\(images/feature-x.png\)
+In the initialization view, you can also configure your organization's API keys. Those will be saved encrypted locally and only be transparently added to the environment of those commands that might need them.
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+### Initiliazation (init)
+
+To taurify your project, just use the `vscode-taurify.init` command that opens a view to enable you configuring your project and your organization in the [CrabNebula Cloud](https://crabnebula.dev/cloud/), which is required for the distribution and updates.
+
+### Run in development mode (dev)
+
+The `vscode-taurify.dev` command runs your current application in development mode. If you have multiple applications in your workspace, it will ask you which one to run.
+
+### Run in production mode (run)
+
+With `vscode-taurify.run`, you can run your current application locally as if it were in production mode. For multiple applications in your workspace, you'll be asked which one.
+
+### Start build and upload to cloud (build)
+
+To distribute the current state of the app as a new version, use the `vscode-taurify.build` command.
+
+### Update front-end
+
+If only the front-end changed, you can have an automatic over-the-wire update with the `vscode-taurify.update` call.
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+To build and distribute or push updates, you need an account for the [Crabnebula Cloud](https://crabnebula.dev/cloud/). Ideally, your project uses [vite](https://vitejs.dev) or a similar dev server and build chain.
+
+A node package runner, `npx`, `pnpx` or `bunx` is also required.
 
 ## Extension Settings
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+While `vscode-taurify` will mostly run out of the box, you can configure the following settings:
 
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+* `taurify.showStatusBarApplet`: Enable/disable the status bar applet. Active by default.
+* `taurify.enableLogs`: Enable writing output to a log file. Enabled by default.
+* `taurify.logFile`: File to write log output to. Default is `.taurify/taurify.log`.
+* `taurify.packageRunner`: Runner to run node packages with. Default is `npx`, `pnpx` and `bunx` are also supported.
 
 ## Known Issues
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+- Since this is a relatively new app, there are no known issues.
 
 ## Release Notes
 
-Users appreciate release notes as you update your extension.
+### 0.0.1
 
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+Initial release
