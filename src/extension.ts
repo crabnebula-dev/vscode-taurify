@@ -276,19 +276,19 @@ export function activate(context: vscode.ExtensionContext) {
     return await vscode.workspace.findFiles("taurify.json");
   }
 
+  function configUriToPath(uri: vscode.Uri) {
+    return uri.toString().replace(/^file:\/\/|\/taurify.json$/g, '')
+  }
+
   async function getCwd(configs: vscode.Uri[]) {
     if (configs.length === 0) {
       return undefined;
     }
     if (configs.length === 1) {
-      return configs[0].toString().replace(/\/taurify.json$/, '');
+      return configUriToPath(configs[0]);
     }
-    const configNames = configs.reduce((names, config) => {
-      names[config.toString().replace(/\/taurify.json$/, '')] = config;
-      return names;
-    }, {} as Record<string, vscode.Uri>)
-    const selection = await vscode.window.showQuickPick(Object.keys(configNames));
-    return selection;
+    const selectable = configs.map(configUriToPath);
+    return await vscode.window.showQuickPick(selectable);
   }
 
   let project = { hasConfig: false };
@@ -402,11 +402,13 @@ export function activate(context: vscode.ExtensionContext) {
     const { stdout, stderr } = process;
     stdout?.on("data", (chunk) => {
       const output = filterSecrets(chunk.toString());
+      console.log(output);
       outputChannel.append(output);
       logFile?.appendFile(`[log ${new Date().toISOString()}] ${output}\n`, 'utf-8');
     });
     stderr?.on("data", (chunk) => {
       const output = filterSecrets(chunk.toString());
+      console.error(output);
       outputChannel.append(output);
       process.lastError = output;
       logFile?.appendFile(`[err ${new Date().toISOString()}] ${output}\n`, 'utf-8');
@@ -506,7 +508,7 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }      
       let cwd = await getCwd(configs);
-      const options = await getEnv("vscode-taurify.build");
+      const options = await getEnv("vscode-taurify.dev");
       const devCall = await runAbortable(`${getRunner()} taurify dev`, { cwd, ...(options ?? {}) });
       context.subscriptions.push(devCall);
     }
@@ -522,7 +524,7 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
       let cwd = await getCwd(configs);
-      const options = await getEnv("vscode-taurify.build");
+      const options = await getEnv("vscode-taurify.run");
       const runCall = await runAbortable(`${getRunner()} taurify run`, { cwd,  ...(options ?? {}) });
       context.subscriptions.push(runCall);
     }
