@@ -276,6 +276,21 @@ export function activate(context: vscode.ExtensionContext) {
     return await vscode.workspace.findFiles("taurify.json");
   }
 
+  async function getCwd(configs: vscode.Uri[]) {
+    if (configs.length === 0) {
+      return undefined;
+    }
+    if (configs.length === 1) {
+      return configs[0].toString().replace(/\/taurify.json$/, '');
+    }
+    const configNames = configs.reduce((names, config) => {
+      names[config.toString().replace(/\/taurify.json$/, '')] = config;
+      return names;
+    }, {} as Record<string, vscode.Uri>)
+    const selection = await vscode.window.showQuickPick(Object.keys(configNames));
+    return selection;
+  }
+
   let project = { hasConfig: false };
   findConfig().then((config) => {
     project.hasConfig = config.length > 0;
@@ -489,9 +504,8 @@ export function activate(context: vscode.ExtensionContext) {
       if (!project.hasConfig) {
         vscode.window.showErrorMessage('No taurify.json found in workspace. Initialize your project first', 'vscode-taurify.init');
         return;
-      }
-      // TODO: multi project selection
-      let cwd = configs.length === 1 ? configs[0].path.replace(/taurify.json$/, '') : undefined;
+      }      
+      let cwd = await getCwd(configs);
       const options = await getEnv("vscode-taurify.build");
       const devCall = await runAbortable(`${getRunner()} taurify dev`, { cwd, ...(options ?? {}) });
       context.subscriptions.push(devCall);
@@ -507,8 +521,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('No taurify.json found in workspace. Initialize your project first', 'vscode-taurify.init');
         return;
       }
-      // TODO: multi project selection
-      let cwd = configs.length === 1 ? configs[0].path.replace(/taurify.json$/, '') : undefined;
+      let cwd = await getCwd(configs);
       const options = await getEnv("vscode-taurify.build");
       const runCall = await runAbortable(`${getRunner()} taurify run`, { cwd,  ...(options ?? {}) });
       context.subscriptions.push(runCall);
@@ -524,8 +537,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('No taurify.json found in workspace. Initialize your project first', 'vscode-taurify.init');
         return;
       }
-      // TODO: multi project selection
-      let cwd = configs.length === 1 ? configs[0].path.replace(/taurify.json$/, '') : undefined;
+      let cwd = await getCwd(configs);
       const options = await getEnv("vscode-taurify.build");
       if (!options) { return; }
       const buildCall = await runAbortable(`${getRunner()} taurify build`, { cwd,  ...(options ?? {}) });
@@ -537,13 +549,15 @@ export function activate(context: vscode.ExtensionContext) {
   const updateCommand = vscode.commands.registerCommand(
     "vscode-taurify.update",
     async () => {
+      const configs = await findConfig();
       if (!project.hasConfig) {
         vscode.window.showErrorMessage('No taurify.json found in workspace. Initialize your project first', 'vscode-taurify.init');
         return;
       }
+      let cwd = await getCwd(configs);
       const options = await getEnv("vscode-taurify.update");
       if (!options) { return; }
-      const updateCall = await runAbortable(`${getRunner()} taurify update`, options);
+      const updateCall = await runAbortable(`${getRunner()} taurify update`, { cwd,  ...(options ?? {}) });
       context.subscriptions.push(updateCall);
     }
   );
