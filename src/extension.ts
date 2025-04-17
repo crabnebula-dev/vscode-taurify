@@ -1,15 +1,10 @@
 import * as vscode from "vscode";
 import { exec, ExecOptions } from "node:child_process";
-import { ObjectEncodingOptions } from "node:fs";
+import { ObjectEncodingOptions, read } from "node:fs";
 import { FileHandle, open } from "node:fs/promises";
 import { env } from 'node:process';
 
 const ORGS_SECRET_STORAGE_KEY = 'taurify-orgs';
-
-// debugging; TODO: remove
-(globalThis as any).vscode = vscode;
-
-const blocks = " ▏▎▍▌▋▊▉▉▉";
 
 let statusBarItem: vscode.StatusBarItem;
 
@@ -23,7 +18,7 @@ function escapeHtml(text: string) {
   return text.replace(/</g, '&lt;');
 }
 
-function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
+function createInitViewHTML(orgs: Record<string, string>, paths: string[], hasFrontendConfig: Record<string, boolean>) {
   const scriptNonce = getNonce();
   const styleNonce = getNonce();
   return `<!doctype html>
@@ -35,6 +30,7 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
     ul { list-style: none; padding: 0; }
     h2 { padding: 10px 0px 0px 10px; }
     li { padding: 10px; }
+    li:has(textarea:disabled) { display: hidden; }
     label { display: block; font-weight: 600; }
     label + p { margin-bottom: 15px; }
     fieldset { border: 0; padding: 0; }
@@ -221,27 +217,26 @@ function createInitViewHTML(orgs: Record<string, string>, paths: string[]) {
         document.getElementById('new-org-slug').focus();
       });
       document.getElementById('project-path').focus();
+      const hasFrontendConfig = ${JSON.stringify(hasFrontendConfig)};
+      function scriptsForProjectPath() {
+        const path = document.getElementById('project-path').value;
+        document.getElementById('run-before-dev').disabled =
+          document.getElementById('run-before-build').disabled = hasFrontendConfig[path] === true;
+      }
+      document.getElementById('project-path').addEventListener('change', scriptsForProjectPath);
+      scriptsForProjectPath();
     })(acquireVsCodeApi());
   </script>
 </body>
 </html>`;
 }
 
-function getBar(progress: number) {
-  const lastDigit = progress % 10;
-  const firstDigit = (progress - lastDigit) / 10;
-  return `${blocks[9].repeat(firstDigit)}${blocks[lastDigit]}`.trim();
-}
-
-function showProgress(progress: number) {
-  if (progress !== 0) {
-    statusBarItem!.text = `Taurification: ${getBar(progress)} ${progress}%`;
-    statusBarItem!.accessibilityInformation = {
-      role: "progressbar",
-      label: "Taurification at ${progress} percent",
-    };
-    // TODO: use statusBarItem.tooltip = MarkdownString to provide additional information
+async function readJSONFile(uri: vscode.Uri) {
+  const file = await vscode.workspace.fs.readFile(uri);
+  if (!file) {
+    throw new Error(`Cannot read file ${uri.toString()}`);
   }
+  return JSON.parse(new TextDecoder().decode(file) || 'undefined');      
 }
 
 export function activate(context: vscode.ExtensionContext) {
@@ -299,18 +294,14 @@ export function activate(context: vscode.ExtensionContext) {
       if (!dataFile) {
         throw new Error('No config found');
       }
-      const configFile = await vscode.workspace.fs.readFile(dataFile);
-      if (!configFile) {
-        throw new Error('Cannot read config');
-      }
-      const configData = JSON.parse(new TextDecoder().decode(configFile) || 'null');
-      if (!configData) {
-        throw new Error('Cannot decode config');
-      }
-      return configData;
+      return readJSONFile(dataFile);
     } catch(e: unknown) {
       throw new Error(`Unable to read the taurify config: ${e}`);
     }
+  }
+
+  async function getPackageConfig(path: vscode.Uri) {    
+    return readJSONFile(vscode.Uri.joinPath(path, 'package.json'));
   }
 
   async function getOrg(command: string) {
@@ -409,7 +400,7 @@ export function activate(context: vscode.ExtensionContext) {
   const initCommand = vscode.commands.registerCommand(
     "vscode-taurify.init",
     async () => {
-      let orgsKeys;
+      let orgsKeys, packageJSON;
       try {
         orgsKeys = JSON.parse(await context.secrets.get(ORGS_SECRET_STORAGE_KEY) ?? '{}');
       } catch(e) {
@@ -421,6 +412,14 @@ export function activate(context: vscode.ExtensionContext) {
           'You already have a configured project. Make sure you do not override settings you still need.'
         );
       }
+      const hasFrontendConfig: Record<string, boolean> = {};
+      try {
+        for (const path of vscode.workspace.workspaceFolders || []) {
+          packageJSON = await getPackageConfig(path.uri);
+          hasFrontendConfig[path.name] = !!packageJSON?.scripts?.dev && !!packageJSON?.scripts?.build;
+        }
+      } catch(e) {}
+      
       const initView = vscode.window.createWebviewPanel(
         "taurify.initview",
         "Taurify",
@@ -429,7 +428,8 @@ export function activate(context: vscode.ExtensionContext) {
       );
       initView.webview.html = createInitViewHTML(
         orgsKeys,
-        vscode.workspace.workspaceFolders?.map(({name}) => name) ?? ['no folders found']
+        vscode.workspace.workspaceFolders?.map(({name}) => name) ?? ['no folders found'],
+        hasFrontendConfig
       );
       context.subscriptions.push(initView);
 
