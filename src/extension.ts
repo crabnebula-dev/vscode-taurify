@@ -364,9 +364,22 @@ export function activate(context: vscode.ExtensionContext) {
       return data.replace(secretFilter, '********');
     };
     if (runInTerminal) {
-      const terminal = vscode.window.createTerminal({ name: "taurify-init", ...runInTerminal });
+      const terminal = vscode.window.createTerminal({ name: "taurify", ...runInTerminal });
       terminal.sendText(command, true);
-      return Object.assign(terminal, { process: { on: () => undefined, lastError: null } });
+      terminal.show();
+      const events: Record<string, ((ev: unknown) => void)[]> = {};
+      vscode.window.onDidCloseTerminal((term) => {
+        if (!terminal.exitStatus) { return; }
+        if (terminal.exitStatus?.code !== 0) {
+          events.exit?.forEach((handler) => handler(terminal.exitStatus?.code || 0));
+        }
+      });
+      return Object.assign(terminal, { process: { on: ((name: string, handler: ((ev: unknown) => void)) => {
+        if (!events[name]) {
+          events[name] = [];
+        }
+        events[name].push(handler);
+      }), lastError: null } });
     }
     const abort = new AbortController();
     const process = Object.assign(
@@ -443,9 +456,9 @@ export function activate(context: vscode.ExtensionContext) {
             `${getRunner()} taurify init --product-name "${productName
               }" --identifier "${identifier}" --org-slug "${orgSlug}" --app-slug "${appSlug
               }" --project-path "${resolvedProjectPath}" --icon "${icon}" --platforms ${platforms.join(' ')
-              } --package-manager ${packageManager} --password ${password} --dev-url "${devUrl                
+              } --package-manager "${packageManager}" --password "${password}" --dev-url "${devUrl                
               }" --run-before-dev "${runBeforeDev}" --run-before-build "${runBeforeBuild
-              }" --bootstrap ${bootstrap || false}`,
+              }" --bootstrap ${bootstrap || false}; exit`,
             undefined,
             [password],
             { cwd: resolvedProjectPath }
@@ -455,7 +468,7 @@ export function activate(context: vscode.ExtensionContext) {
               if (statusBarItem.text === 'Taurify: initializing...') {
                 statusBarItem.text = 'Taurify';
               }
-              if ((code ?? 0) > 0) {
+              if (Number(code) > 0) {
                 vscode.window.showErrorMessage(`Taurify initialization failed: ${initCall.process.lastError}`);
               }
             });
