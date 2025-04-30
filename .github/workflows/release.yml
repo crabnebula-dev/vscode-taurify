@@ -33,6 +33,6 @@ jobs:
         run: pnpm package
 
       - name: Publish package
-        run: vsce package; vsce publish
+        run: pnpm vsce package; pnpm vsce publish
         env:
           VSCE_PAT: ${{ secrets.AZURE_PUBLISHER_PAT }}
