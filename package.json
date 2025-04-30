@@ -3,12 +3,19 @@
   "displayName": "vscode-taurify",
   "description": "Taurify your web app",
   "version": "0.0.1",
+  "publisher": "CrabNebula",
   "engines": {
     "vscode": "^1.97.0"
   },
   "categories": [
     "Other"
   ],
+  "icon": "vscode-taurify-icon.png",
+  "galleryBanner": {
+    "color": "#051024",
+    "theme": "dark"
+  },
+  "keywords": ["Tauri", "Runtime", "Native", "Application"],
   "activationEvents": ["onStartupFinished"],
   "main": "./dist/extension.js",
   "contributes": {
@@ -86,6 +93,7 @@
     "npm-run-all": "^4.1.5",
     "typescript": "^5.8.2",
     "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.4.1"
+    "@vscode/test-electron": "^2.4.1",
+    "@vscode/vsce": "^3.3.2"
   }
 }

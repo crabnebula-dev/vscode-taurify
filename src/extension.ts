@@ -12,11 +12,11 @@ let statusBarItem: vscode.StatusBarItem;
 
 const outputChannel = vscode.window.createOutputChannel("Taurify");
 
-function escapeAttr(text: string) {
-  return text.replace(/(?:^|[^\\])(?:\\\\)*\\"/g, '\\"');
+export function escapeAttr(text: string) {
+  return text.replace(/(^|[^\\])(?:\\\\)*"/g, '$1\\"');
 }
 
-function escapeHtml(text: string) {
+export function escapeHtml(text: string) {
   return text.replace(/</g, '&lt;');
 }
 
@@ -277,7 +277,7 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   function configUriToPath(uri: vscode.Uri) {
-    return uri.toString().replace(/^file:\/\/|\/taurify.json$/g, '')
+    return uri.toString().replace(/^file:\/\/|\/taurify.json$/g, '');
   }
 
   async function getCwd(configs: vscode.Uri[]) {

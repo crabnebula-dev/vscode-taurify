@@ -1,15 +1,28 @@
 import * as assert from 'assert';
-
-// You can import and use all API from the 'vscode' module
-// as well as import your extension to test it
 import * as vscode from 'vscode';
-// import * as myExtension from '../../extension';
+import { escapeAttr, escapeHtml } from '../extension';
 
-suite('Extension Test Suite', () => {
+suite('vscode-taurify Test Suite', () => {
 	vscode.window.showInformationMessage('Start all tests.');
 
-	test('Sample test', () => {
-		assert.strictEqual(-1, [1, 2, 3].indexOf(5));
-		assert.strictEqual(-1, [1, 2, 3].indexOf(0));
+	const controller = vscode.tests.createTestController(
+		'vscode-taurify-test', 
+		'Testing vscode-taurify'
+	);
+
+	test('XSS prevention: attribute escaping', () => {
+		assert.equal(
+			escapeAttr('" onmouseover="alert(1)'),
+			'\\" onmouseover=\\"alert(1)',
+			'HTML attribute hoverjackign worked'
+		);
+	});
+
+	test('XSS prevention: html escaping', () => {
+		assert.equal(
+			escapeHtml('<span onmouseover="alert(1)">&nbsp;</span>'),
+			'&lt;span onmouseover="alert(1)">&nbsp;&lt;/span>',
+			'HTML hoverjacking worked'
+		);
 	});
 });
