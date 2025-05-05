@@ -4,6 +4,10 @@
   "description": "Taurify your web app",
   "version": "0.0.1",
   "publisher": "CrabNebula",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/crabnebula-dev/vscode-taurify.git"
+  },
   "engines": {
     "vscode": "^1.99.0"
   },
