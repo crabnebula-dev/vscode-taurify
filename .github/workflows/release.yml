@@ -32,18 +32,22 @@ jobs:
       - name: Build package
         run: pnpm package
 
+  publish_on_marketplace:
+    concurrency:
+      group: publish
+      cancel-in-progress: false
+    steps:
       - name: Publish package on official marketplace
-        concurrency:
-          group: publish
-          cancel-in-progress: false
         run: pnpm vsce publish
         env:
           VSCE_PAT: ${{ secrets.AZURE_PUBLISHER_PAT }}
 
+  publish_on_openvsx:
+    concurrency:
+      group: publish
+      cancel-in-progress: false
+    steps:
       - name: Publish package on open-vsx
-        concurrency:
-          group: publish
-          cancel-in-progress: false
         run: pnpx ovsx publish
         env:
           OVSX_PAT: ${{ secrets.OPENVSX_TOKEN }}
