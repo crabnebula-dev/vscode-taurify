@@ -36,4 +36,4 @@ jobs:
         run: pnpm vsce publish; pnpx ovsx publish
         env:
           VSCE_PAT: ${{ secrets.AZURE_PUBLISHER_PAT }}
-          OSVX_PAT: ${{ secrets.OPENVSX_TOKEN }}
+          OVSX_PAT: ${{ secrets.OPENVSX_TOKEN }}
