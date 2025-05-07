@@ -2,7 +2,7 @@
   "name": "vscode-taurify",
   "displayName": "vscode-taurify",
   "description": "Taurify your web app",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "publisher": "CrabNebula",
   "repository": {
     "type": "git",
