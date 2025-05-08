@@ -20,17 +20,19 @@ To taurify your project, just use the `vscode-taurify.init` command that opens a
 
 The `vscode-taurify.dev` command runs your current application in development mode. If you have multiple applications in your workspace, it will ask you which one to run.
 
+While the development mode is running, the status bar item will be shown in red.
+
 ### Run in production mode (run)
 
 With `vscode-taurify.run`, you can run your current application locally as if it were in production mode. For multiple applications in your workspace, you'll be asked which one.
 
-### Start build and upload to cloud (build)
+### Update full app (full-update)
 
-To distribute the current state of the app as a new version, use the `vscode-taurify.build` command.
+To distribute the current state of the app as a new version, use the `vscode-taurify.full-update` command.
 
-### Update front-end
+### Update front-end (frontend-update)
 
-If only the front-end changed, you can have an automatic over-the-wire update with the `vscode-taurify.update` call.
+If only the front-end (the part running in the web view) changed, you can have an automatic over-the-wire update with the `vscode-taurify.frontend-update` call.
 
 ## Requirements
 

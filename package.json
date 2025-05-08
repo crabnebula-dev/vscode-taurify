@@ -2,7 +2,7 @@
   "name": "vscode-taurify",
   "displayName": "vscode-taurify",
   "description": "Taurify your web app",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "publisher": "CrabNebula",
   "repository": {
     "type": "git",
@@ -37,12 +37,12 @@
         "title": "Taurify: Run in production mode"
       },
       {
-        "command": "vscode-taurify.build",
-        "title": "Taurify: Start build and upload to Cloud"
+        "command": "vscode-taurify.full-update",
+        "title": "Taurify: Publish full update"
       },
       {
-        "command": "vscode-taurify.update",
-        "title": "Taurify: Update front-end"
+        "command": "vscode-taurify.frontend-update",
+        "title": "Taurify: Publish front-end update"
       }
     ],
     "configuration": {

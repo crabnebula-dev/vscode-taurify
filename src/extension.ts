@@ -509,7 +509,14 @@ export function activate(context: vscode.ExtensionContext) {
       }      
       let cwd = await getCwd(configs);
       const options = await getEnv("vscode-taurify.dev");
+      const { backgroundColor, color } = statusBarItem;
+      statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
+      statusBarItem.color = new vscode.ThemeColor("statusBarItem.errorForeground");
       const devCall = await runAbortable(`${getRunner()} taurify dev`, { cwd, ...(options ?? {}) });
+      devCall.process.on('exit', () => {
+        statusBarItem.backgroundColor = backgroundColor;
+        statusBarItem.color = color;
+      });
       context.subscriptions.push(devCall);
     }
   );
@@ -532,7 +539,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(runCommand);
 
   const buildCommand = vscode.commands.registerCommand(
-    "vscode-taurify.build",
+    "vscode-taurify.full-update",
     async () => {
       const configs = await findConfig();
       if (!project.hasConfig) {
@@ -540,7 +547,7 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
       let cwd = await getCwd(configs);
-      const options = await getEnv("vscode-taurify.build");
+      const options = await getEnv("vscode-taurify.full-update");
       if (!options) { return; }
       const buildCall = await runAbortable(`${getRunner()} taurify build`, { cwd,  ...(options ?? {}) });
       context.subscriptions.push(buildCall);
@@ -549,7 +556,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(buildCommand);
 
   const updateCommand = vscode.commands.registerCommand(
-    "vscode-taurify.update",
+    "vscode-taurify.frontend-update",
     async () => {
       const configs = await findConfig();
       if (!project.hasConfig) {
@@ -557,7 +564,7 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
       let cwd = await getCwd(configs);
-      const options = await getEnv("vscode-taurify.update");
+      const options = await getEnv("vscode-taurify.frontend-update");
       if (!options) { return; }
       const updateCall = await runAbortable(`${getRunner()} taurify update`, { cwd,  ...(options ?? {}) });
       context.subscriptions.push(updateCall);
