@@ -2,3 +2,7 @@ allowBuilds:
   '@vscode/vsce-sign': true
   esbuild: true
   keytar: true
+
+overrides:
+  diff@>=6.0.0 <8.0.3: ^8.0.3
+  serialize-javascript@<7.0.5: ^7.0.5
