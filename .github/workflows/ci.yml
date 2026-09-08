@@ -8,9 +8,8 @@ on:
   pull_request:
 
 jobs:
-  build:
+  test:
     runs-on: windows-latest
-    name: CI
     steps:
       - uses: actions/checkout@v7
         name: Check out repo
