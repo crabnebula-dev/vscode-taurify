@@ -1,0 +1,44 @@
+name: Audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+  pull_request:
+    paths:
+      - '.github/workflows/audit.yml'
+      - '**/package.json'
+      - '**/pnpm-lock.yaml'
+  push:
+    branches:
+      - dev
+    paths:
+      - '.github/workflows/audit.yml'
+      - '**/package.json'
+      - '**/pnpm-lock.yaml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  audit-js:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        name: Install pnpm
+        with:
+          version: 12
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - run: pnpm audit
