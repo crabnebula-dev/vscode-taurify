@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   test:
+    # Not using Linux because We'll need to additional setup like an X server for the electron test to work
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
