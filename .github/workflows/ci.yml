@@ -17,6 +17,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         name: Check out repo
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v6
         name: Install pnpm
